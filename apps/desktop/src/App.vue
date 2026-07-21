@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import type { Profile } from '@velix/core'
 import { PLUGINS } from './registry'
 import { useProfilesStore } from './stores/profiles'
@@ -8,9 +8,17 @@ const store = useProfilesStore()
 const newNames = ref<Record<string, string>>({})
 const error = ref<string | null>(null)
 
+let unwatchUnread: (() => void) | null = null
+
 onMounted(() => {
   store.load().catch((e) => (error.value = String(e)))
+  store
+    .watchUnread()
+    .then((unwatch) => (unwatchUnread = unwatch))
+    .catch((e) => (error.value = String(e)))
 })
+
+onUnmounted(() => unwatchUnread?.())
 
 async function run(action: () => Promise<unknown>) {
   error.value = null
@@ -66,6 +74,13 @@ function openProfile(profile: Profile) {
                   title="Open"
                 />
               </button>
+              <span
+                v-if="store.unread[profile.id]"
+                class="grid h-4.5 min-w-4.5 place-items-center rounded-full bg-indigo-500/20 px-1.25 text-[10.5px] font-bold text-indigo-300"
+                :title="`${store.unread[profile.id]} tin chưa đọc`"
+              >
+                {{ store.unread[profile.id] }}
+              </span>
               <button
                 v-if="store.openLabels[profile.id]"
                 class="hidden cursor-pointer text-zinc-500 hover:text-zinc-200 group-hover:block"

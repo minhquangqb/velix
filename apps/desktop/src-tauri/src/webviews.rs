@@ -6,7 +6,7 @@ use tauri::{
     Window,
 };
 
-use crate::AppState;
+use crate::{bridge, AppState};
 
 pub const UI_LABEL: &str = "ui";
 pub const MAIN_WINDOW: &str = "main";
@@ -50,14 +50,26 @@ fn workspace_bounds<R: Runtime>(
     ))
 }
 
-/// Repositions platform webviews into the workspace area. Needed because
-/// `auto_resize` scales proportionally and would drift the fixed sidebar edge.
+/// Resizes the shell UI to fill the window and repositions platform webviews
+/// into the workspace area. Both are explicit because `auto_resize` scales
+/// proportionally from the size a webview was created at, which drifts the
+/// fixed sidebar edge and is simply wrong when the window starts maximized.
 pub fn relayout<R: Runtime>(window: &Window<R>) {
     let Ok((position, size)) = workspace_bounds(window) else {
         return;
     };
+    let full = window
+        .inner_size()
+        .ok()
+        .zip(window.scale_factor().ok())
+        .map(|(size, scale)| size.to_logical::<f64>(scale));
+
     for webview in window.webviews() {
         if webview.label() == UI_LABEL {
+            if let Some(full) = full {
+                let _ = webview.set_position(LogicalPosition::new(0.0, 0.0));
+                let _ = webview.set_size(LogicalSize::new(full.width, full.height));
+            }
             continue;
         }
         let _ = webview.set_position(position);
@@ -76,6 +88,8 @@ fn show_only<R: Runtime>(window: &Window<R>, label: &str) -> Result<(), String> 
             let _ = webview.hide();
         }
     }
+    // The user is now looking at it, so its notifications are no longer unread.
+    bridge::clear_unread(window.app_handle(), label);
     Ok(())
 }
 
@@ -89,6 +103,7 @@ pub fn close_by_label<R: Runtime>(app: &AppHandle<R>, label: &str) -> Result<(),
     if let Some(webview) = window.webviews().into_iter().find(|w| w.label() == label) {
         webview.close().map_err(|e| e.to_string())?;
     }
+    bridge::forget(app, label);
     Ok(())
 }
 
@@ -127,10 +142,16 @@ pub async fn open_webview<R: Runtime>(
         let data_dir = profile_data_dir(&app, &plugin_id, &profile_id)?;
         fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
 
+        // Must precede the webview: the page starts calling the bridge as soon
+        // as it loads, and a capability added later would not cover those calls.
+        bridge::grant_remote_access(&app, &label, &parsed)?;
+
         let (position, size) = workspace_bounds(&window).map_err(|e| e.to_string())?;
         window
             .add_child(
-                WebviewBuilder::new(&label, WebviewUrl::External(parsed)).data_directory(data_dir),
+                WebviewBuilder::new(&label, WebviewUrl::External(parsed))
+                    .data_directory(data_dir)
+                    .initialization_script(bridge::INJECT_SCRIPT),
                 position,
                 size,
             )

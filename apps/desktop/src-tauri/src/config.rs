@@ -10,11 +10,66 @@ pub struct Profile {
     pub name: String,
 }
 
+/// Last known geometry of the main window, restored on the next launch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowState {
+    pub width: f64,
+    pub height: f64,
+    /// `None` until the window has been moved, so the first launch stays centered.
+    pub x: Option<f64>,
+    pub y: Option<f64>,
+    pub maximized: bool,
+}
+
+impl Default for WindowState {
+    fn default() -> Self {
+        Self {
+            width: 1200.0,
+            height: 800.0,
+            x: None,
+            y: None,
+            maximized: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Settings {
+    /// Suppresses native notifications; unread badges keep updating.
+    #[serde(default)]
+    pub quiet: bool,
+    /// Closing the main window hides it to tray instead of quitting.
+    #[serde(default = "default_true")]
+    pub close_to_tray: bool,
+    #[serde(default)]
+    pub autostart: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            quiet: false,
+            close_to_tray: true,
+            autostart: false,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     #[serde(default)]
     pub profiles: Vec<Profile>,
+    #[serde(default)]
+    pub window: WindowState,
+    #[serde(default)]
+    pub settings: Settings,
 }
 
 /// JSON-backed app config. All mutations go through this store so the file on

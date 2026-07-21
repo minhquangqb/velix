@@ -5,8 +5,11 @@ import {
   deleteProfile,
   focusWebview,
   listProfiles,
+  listUnread,
+  onUnread,
   openWebview,
   type Profile,
+  type UnreadEntry,
 } from '@velix/core'
 
 export const useProfilesStore = defineStore('profiles', {
@@ -14,6 +17,8 @@ export const useProfilesStore = defineStore('profiles', {
     profiles: [] as Profile[],
     /** profileId -> webview label, for profiles whose webview is open */
     openLabels: {} as Record<string, string>,
+    /** profileId -> unread count, pushed by the Rust notification bridge */
+    unread: {} as Record<string, number>,
     activeProfileId: null as string | null,
   }),
   getters: {
@@ -24,6 +29,14 @@ export const useProfilesStore = defineStore('profiles', {
   actions: {
     async load() {
       this.profiles = await listProfiles()
+    },
+    /** Mirrors unread counts from Rust; resolves to an unsubscribe function. */
+    async watchUnread() {
+      const apply = (entries: UnreadEntry[]) => {
+        this.unread = Object.fromEntries(entries.map((e) => [e.profileId, e.count]))
+      }
+      apply(await listUnread())
+      return onUnread(apply)
     },
     async create(pluginId: string, name: string) {
       const profile = await createProfile(pluginId, name)
