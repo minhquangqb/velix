@@ -31,13 +31,36 @@ pub const INJECT_SCRIPT: &str = r#"
   if (window.__VELIX_BRIDGE__) return;
   Object.defineProperty(window, '__VELIX_BRIDGE__', { value: true });
 
+  // Diagnostics. The page is a black box: if it never calls these APIs, the
+  // bridge is silent for reasons no log on the Rust side can distinguish from
+  // an IPC failure. `__velixProbe()` in devtools tells the two apart.
+  var stats = { ctor: 0, sw: 0, badge: 0, sent: 0, failed: 0 };
+  var lastError = null;
+
   function invoke(cmd, args) {
     try {
       var internals = window.__TAURI_INTERNALS__;
       if (internals && internals.invoke) {
-        return Promise.resolve(internals.invoke('plugin:velix|' + cmd, args)).catch(function () {});
+        return Promise.resolve(internals.invoke('plugin:velix|' + cmd, args)).then(
+          function (value) {
+            stats.sent++;
+            return value;
+          },
+          function (error) {
+            // Swallowed so a blocked call cannot break the page, but recorded:
+            // an ACL rejection and an API the page never calls look identical
+            // from the outside otherwise.
+            stats.failed++;
+            lastError = String(error);
+            return undefined;
+          }
+        );
       }
-    } catch (e) {}
+      lastError = '__TAURI_INTERNALS__.invoke missing';
+    } catch (e) {
+      lastError = String(e);
+    }
+    stats.failed++;
     return Promise.resolve();
   }
 
@@ -48,6 +71,31 @@ pub const INJECT_SCRIPT: &str = r#"
       body: options.body == null ? '' : String(options.body)
     });
   }
+
+  window.__velixProbe = function () {
+    var report = {
+      bridgeInstalled: true,
+      tauriInternals: !!(window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke),
+      notificationPermission: window.Notification ? window.Notification.permission : 'no api',
+      badgeApi: typeof navigator.setAppBadge,
+      serviceWorkerControlled: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+      documentTitle: document.title,
+      visibilityState: document.visibilityState,
+      hasFocus: document.hasFocus(),
+      calls: stats,
+      lastError: lastError
+    };
+    console.log('[velix probe]\n' + JSON.stringify(report, null, 2));
+    return report;
+  };
+
+  /** Fires a notification straight through the bridge, skipping the page. */
+  window.__velixTest = function () {
+    return invoke('notify', { title: 'Velix', body: 'Test tu devtools' }).then(function () {
+      console.log('[velix test] sent=' + stats.sent + ' failed=' + stats.failed +
+        ' lastError=' + lastError);
+    });
+  };
 
   function VelixNotification(title, options) {
     options = options || {};
@@ -60,6 +108,7 @@ pub const INJECT_SCRIPT: &str = r#"
     this.onclose = null;
     this.onerror = null;
     this.onshow = null;
+    stats.ctor++;
     send(title, options);
   }
   VelixNotification.prototype.close = function () {};
@@ -85,6 +134,7 @@ pub const INJECT_SCRIPT: &str = r#"
   try {
     if (window.ServiceWorkerRegistration && window.ServiceWorkerRegistration.prototype) {
       window.ServiceWorkerRegistration.prototype.showNotification = function (title, options) {
+        stats.sw++;
         send(title, options);
         return Promise.resolve();
       };
@@ -96,11 +146,13 @@ pub const INJECT_SCRIPT: &str = r#"
 
   try {
     navigator.setAppBadge = function (count) {
+      stats.badge++;
       var n = Number(count);
       invoke('set_badge', { count: isFinite(n) && n > 0 ? Math.floor(n) : 0 });
       return Promise.resolve();
     };
     navigator.clearAppBadge = function () {
+      stats.badge++;
       invoke('set_badge', { count: 0 });
       return Promise.resolve();
     };

@@ -87,6 +87,25 @@ pub fn relayout<R: Runtime>(window: &Window<R>) {
     }
 }
 
+/// Label of the platform webview currently on screen, for devtools targeting.
+#[derive(Default)]
+pub struct ActiveWebview(pub std::sync::Mutex<Option<String>>);
+
+/// Opens devtools on the platform webview currently on screen.
+///
+/// Debug builds only. A platform page is a black box — when the notification
+/// bridge stays silent, its console is the only place that says whether the
+/// page ever called the APIs the bridge hooks.
+#[cfg(debug_assertions)]
+pub fn open_devtools<R: Runtime>(app: &AppHandle<R>) {
+    let Ok(window) = main_window(app) else { return };
+    let active = app.state::<ActiveWebview>().0.lock().unwrap().clone();
+    let Some(active) = active else { return };
+    if let Some(webview) = window.webviews().into_iter().find(|w| w.label() == active) {
+        webview.open_devtools();
+    }
+}
+
 fn show_only<R: Runtime>(window: &Window<R>, label: &str) -> Result<(), String> {
     for webview in window.webviews() {
         if webview.label() == UI_LABEL {
@@ -98,6 +117,13 @@ fn show_only<R: Runtime>(window: &Window<R>, label: &str) -> Result<(), String> 
             let _ = webview.hide();
         }
     }
+    *window
+        .app_handle()
+        .state::<ActiveWebview>()
+        .0
+        .lock()
+        .unwrap() = Some(label.to_string());
+
     // The user is now looking at it, so its notifications are no longer unread.
     bridge::clear_unread(window.app_handle(), label);
     Ok(())

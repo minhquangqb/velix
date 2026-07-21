@@ -28,14 +28,24 @@ fn launched_by_autostart() -> bool {
 }
 
 /// `Ctrl+Shift+V` brings the window back — the shortcut the tray popup advertises.
+/// In debug builds `Ctrl+Shift+I` opens devtools on the platform webview on
+/// screen; it has to be a global shortcut because that webview owns the
+/// keyboard while it is focused, so a key handler in the shell never sees it.
 fn global_shortcut_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
     let toggle = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV);
+    let devtools = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyI);
     tauri_plugin_global_shortcut::Builder::new()
-        .with_shortcuts([toggle])
+        .with_shortcuts([toggle, devtools])
         .expect("invalid global shortcut")
         .with_handler(move |app, shortcut, event| {
-            if event.state() == ShortcutState::Pressed && shortcut == &toggle {
+            if event.state() != ShortcutState::Pressed {
+                return;
+            }
+            if shortcut == &toggle {
                 tray::show_main(app);
+            } else if shortcut == &devtools {
+                #[cfg(debug_assertions)]
+                webviews::open_devtools(app);
             }
         })
         .build()
@@ -55,6 +65,7 @@ pub fn run() {
             let config_path = app.path().app_config_dir()?.join("config.json");
             app.manage(AppState(Mutex::new(ConfigStore::load(config_path))));
             app.manage(bridge::BridgeState::default());
+            app.manage(webviews::ActiveWebview::default());
             app.manage(tray::TrayState::default());
             settings::sync_autostart(app.handle());
 
