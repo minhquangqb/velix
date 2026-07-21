@@ -11,12 +11,6 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
-    "paths": {
-      "@velix/sdk": ["packages/sdk/src"],
-      "@velix/core": ["packages/core/src"],
-      "@velix/ui": ["packages/ui/src"]
-    }
+    "forceConsistentCasingInFileNames": true
   }
 }
