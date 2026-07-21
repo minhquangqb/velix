@@ -23,7 +23,7 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
   - Đóng cửa sổ = ẩn xuống tray (`closeToTray`, mặc định bật); thoát hẳn chỉ từ popup tray. Autostart + global shortcut `Ctrl+Shift+V`
   - ⚠️ **Notification trên Windows chỉ hiện đúng khi app đã được cài** (WinRT toast cần AppUserModelID từ shortcut Start Menu). Chạy `pnpm tauri dev` sẽ thấy toast mang tên/icon PowerShell — **không phải bug**, muốn verify thật phải build + install
   - ⚠️ Đã nâng `tauri >= 2.11.1` vì CVE-2026-42184 (GHSA-7gmj-67g7-phm9): trên Windows origin remote có thể bị nhận nhầm là local — đúng kịch bản webview remote của Velix
-- 🟡 **Phase 3 — code xong, CHỜ USER VERIFY RUNTIME** — Workspace UI theo design. Đã pass `cargo fmt`/`cargo clippy` (0 warning), `pnpm typecheck`, `pnpm lint`, `pnpm build`; chưa chạy thử GUI.
+- ✅ **Phase 3** — Workspace UI theo design, commit `feat: add workspace UI, themes and settings (Phase 3)` + `feat: use lucide icons and real platform logos`. User đã verify runtime OK.
   - **Cửa sổ frameless** (`decorations(false)`, min 860×640). Nút min/max/close + drag đi qua `window_ctl.rs`, **không** dùng `@tauri-apps/api/window`: shell chạy trong webview **con**, ở đó JS window API và `data-tauri-drag-region` không được nối. Double-click title bar = maximize (bắt bằng `event.detail === 2`, vì `start_dragging` giao cử chỉ cho OS ngay khi mousedown)
   - **Hằng số layout phải khớp hai bên**: `RAIL_WIDTH 68` + `ACCOUNTS_WIDTH 248` (= `SIDEBAR_WIDTH 316`) + `TOPBAR_HEIGHT 44` trong `webviews.rs` ↔ `w-17` / `w-62` trong `PlatformRail.vue` / `AccountList.vue` và `h-11` trong `TitleBar.vue`. Webview nền tảng được đặt vào đúng cái lỗ đó
   - ⚠️ **Webview con luôn vẽ ĐÈ lên webview `ui`** — không thể phủ HTML lên nó. Mọi bề mặt toàn cửa sổ (Settings, Account Manager, Add Account, First-run) phải gọi `hide_webviews` trước; `tabs.detach()` làm việc này và nhớ `resumeProfileId` để quay lại
@@ -45,7 +45,12 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
     - Chưa làm: kéo-thả sắp xếp account, trạng thái offline/"Thử lại", trạng thái "đang ngủ" (unload webview lâu không dùng — thuộc phần tối ưu RAM Phase 5)
     - Không nạp Google Fonts (Be Vietnam Pro / Space Grotesk / JetBrains Mono) — app desktop chạy offline, hiện fallback `system-ui`. Muốn đúng chữ thì phải bundle font vào assets
     - Component dùng chung vẫn nằm ở `apps/desktop/src/components`, chưa đưa sang `packages/ui`: package đó build bằng `tsc` thuần, chưa có pipeline SFC, và mới chỉ có một nơi dùng
-- Chưa làm: Downloads (tách riêng), Phase 4 (plugin system), Phase 5 (release)
+- ⬜ **Phase 3.5 — Webview UX (chèn thêm, làm TRƯỚC Phase 4)** — chưa bắt đầu. Lý do chèn: sau Phase 3 app đã "dùng được" về mặt UI nhưng **chưa dùng được thật để chat**. Phase 4 (plugin system) là tái cấu trúc, không cải thiện trải nghiệm; Downloads không liên quan tới nhắn tin. Việc cần làm, theo thứ tự:
+  - **Spike đăng nhập trước tiên** (build + install, **không** dev mode): thử login cả 4 nền tảng. Google chặn OAuth trong webview nhúng → có thể phải giả user-agent per-platform (xem pake-learnings mục 1). Kết quả spike quyết định phần còn lại
+  - **Link ngoài → trình duyệt hệ thống.** Hiện bấm link trong chat là webview điều hướng đi luôn, mà ACL notification scope theo origin → rời `messenger.com` là mất quyền IPC, thông báo chết, không có đường quay lại. Đây là lỗi gặp ngay ngày đầu dùng
+  - **Navigation**: back/forward/reload + zoom native (`set_zoom`, **không** dùng CSS transform — vỡ layout SPA, chính ChatGPT bị)
+  - **Verify notification thật** bằng bản build + install (Phase 2 mới verify ở dev mode, mà dev mode toast mang tên PowerShell). Đường notification của Messenger đi qua service worker — polyfill đã viết nhưng chưa chứng minh chạy
+- Chưa làm: Phase 4 (plugin system), Downloads (tách riêng), Phase 5 (release)
 
 ## Design
 
