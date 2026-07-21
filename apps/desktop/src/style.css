@@ -1,1 +1,177 @@
 @import 'tailwindcss';
+
+/*
+ * Theme tokens from the Claude Design project ("Velix Main v2" / "Velix Main
+ * Light"). Every surface colour in the shell goes through a variable so the
+ * light theme is a token swap rather than a second set of components.
+ *
+ * `data-theme` is stamped on <html> by src/theme.ts; the "system" setting
+ * resolves to dark or light there, never left unset.
+ */
+@theme {
+  --font-sans: 'Be Vietnam Pro', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+:root,
+:root[data-theme='dark'] {
+  --vx-window: linear-gradient(180deg, #101118, #0d0e13);
+  --vx-rail: #0a0b0f;
+  --vx-accounts: #101117;
+  --vx-workspace: #0d0e13;
+  --vx-panel: rgba(23, 24, 32, 0.98);
+
+  --vx-text: #ecedf1;
+  --vx-text-2: #9a9ca8;
+  --vx-text-3: #7a7c88;
+  --vx-text-4: #5c5e6b;
+  --vx-text-5: #4a4c58;
+
+  --vx-accent: #7c8cf8;
+  --vx-accent-text: #aab4fb;
+  --vx-accent-grad: linear-gradient(180deg, #8290f9, #6474ee);
+  --vx-brand-grad: linear-gradient(145deg, #8a97fa, #5d6ce8 55%, #4a57c9);
+
+  --vx-success: #3dd68c;
+  --vx-warning: #f5c044;
+  --vx-danger: #f2555a;
+  --vx-danger-grad: linear-gradient(180deg, #f2555a, #d93a3f);
+  --vx-close-hover: #c42b1c;
+
+  --vx-hairline: rgba(255, 255, 255, 0.05);
+  --vx-card-border: rgba(255, 255, 255, 0.06);
+  --vx-divider: rgba(255, 255, 255, 0.045);
+  --vx-input-border: rgba(255, 255, 255, 0.1);
+  --vx-card: rgba(255, 255, 255, 0.02);
+  --vx-hover: rgba(255, 255, 255, 0.045);
+  --vx-nav-hover: rgba(255, 255, 255, 0.04);
+  --vx-ghost: rgba(255, 255, 255, 0.05);
+  --vx-ghost-hover: rgba(255, 255, 255, 0.09);
+  --vx-well: rgba(0, 0, 0, 0.3);
+  --vx-track-off: rgba(255, 255, 255, 0.09);
+  --vx-scrim: rgba(4, 5, 8, 0.6);
+  --vx-dots: rgba(255, 255, 255, 0.045);
+
+  --vx-shadow-panel: 0 32px 80px rgba(0, 0, 0, 0.6);
+  --vx-shadow-toast: 0 16px 48px rgba(0, 0, 0, 0.5);
+  /* Border colour of the online pip, matched to the account column behind it. */
+  --vx-pip-ring: #101117;
+}
+
+:root[data-theme='light'] {
+  --vx-window: linear-gradient(180deg, #f5f6fa, #eef0f5);
+  --vx-rail: #e8eaf1;
+  --vx-accounts: #f1f2f7;
+  --vx-workspace: #eef0f5;
+  --vx-panel: rgba(253, 253, 255, 0.98);
+
+  --vx-text: #1c1d26;
+  --vx-text-2: #666877;
+  --vx-text-3: #61646f;
+  --vx-text-4: #565866;
+  --vx-text-5: #696c7a;
+
+  --vx-accent: #7c8cf8;
+  --vx-accent-text: #4a57c9;
+  --vx-accent-grad: linear-gradient(180deg, #8290f9, #6474ee);
+  --vx-brand-grad: linear-gradient(145deg, #8a97fa, #5d6ce8 55%, #4a57c9);
+
+  --vx-success: #127a4a;
+  --vx-warning: #a87b10;
+  --vx-danger: #d8383e;
+  --vx-danger-grad: linear-gradient(180deg, #f2555a, #d93a3f);
+  --vx-close-hover: #c42b1c;
+
+  --vx-hairline: rgba(16, 19, 38, 0.06);
+  --vx-card-border: rgba(16, 19, 38, 0.1);
+  --vx-divider: rgba(16, 19, 38, 0.07);
+  --vx-input-border: rgba(16, 19, 38, 0.1);
+  --vx-card: rgba(16, 19, 38, 0.03);
+  --vx-hover: rgba(16, 19, 38, 0.055);
+  --vx-nav-hover: rgba(16, 19, 38, 0.06);
+  --vx-ghost: rgba(16, 19, 38, 0.06);
+  --vx-ghost-hover: rgba(16, 19, 38, 0.1);
+  --vx-well: rgba(16, 19, 38, 0.04);
+  --vx-track-off: rgba(16, 19, 38, 0.14);
+  --vx-scrim: rgba(30, 33, 52, 0.3);
+  --vx-dots: rgba(16, 19, 38, 0.055);
+
+  /* Light shadows are tinted blue-grey, not neutral black. */
+  --vx-shadow-panel: 0 32px 80px rgba(30, 34, 60, 0.18);
+  --vx-shadow-toast: 0 16px 48px rgba(30, 34, 60, 0.15);
+  --vx-pip-ring: #f1f2f7;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--vx-text);
+  -webkit-font-smoothing: antialiased;
+  /* Chrome the shell draws itself: no rubber-band, no stray text selection. */
+  overflow: hidden;
+  user-select: none;
+}
+
+::selection {
+  background: rgba(124, 140, 248, 0.32);
+}
+
+/* Inputs are the one place text selection is wanted back. */
+input,
+textarea {
+  user-select: text;
+}
+
+@keyframes vx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes vx-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vx-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.vx-fade {
+  animation: vx-fade 0.25s ease;
+}
+
+.vx-pop {
+  animation: vx-pop 0.16s ease;
+}
+
+.vx-spin {
+  animation: vx-spin 0.8s linear infinite;
+}
+
+/* Scrollbars styled to disappear into the panel they sit in. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vx-ghost-hover) transparent;
+}

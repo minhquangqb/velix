@@ -1,20 +1,34 @@
 // Platform-agnostic core: typed IPC wrappers over the Rust managers.
 export type { VelixPlugin } from '@velix/sdk'
-export type { Profile, Settings, UnreadEntry } from './types'
+export type { NavigateRequest, Profile, Settings, Theme, UnreadEntry, WindowStatus } from './types'
 export {
   listProfiles,
   createProfile,
+  renameProfile,
+  setProfileMuted,
   deleteProfile,
   openWebview,
   focusWebview,
+  hideWebviews,
   closeWebview,
   getSettings,
+  setTheme,
   setQuiet,
   setCloseToTray,
   setAutostart,
   showMainWindow,
+  openSettings,
+  openAccount,
   hideTrayPopup,
   listUnread,
   quitApp,
+  windowIsMaximized,
+  windowMinimize,
+  windowToggleMaximize,
+  windowClose,
+  windowStartDrag,
   onUnread,
+  onSettings,
+  onWindowStatus,
+  onNavigate,
 } from './ipc'

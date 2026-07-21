@@ -34,12 +34,51 @@ pub fn create_profile(
         id,
         plugin_id,
         name,
+        muted: false,
     };
 
     let mut store = state.0.lock().unwrap();
     store.config.profiles.push(profile.clone());
     store.save()?;
     Ok(profile)
+}
+
+/// Applies `edit` to the profile with `id` and persists the config.
+fn update<F: FnOnce(&mut Profile)>(
+    state: &State<'_, AppState>,
+    id: &str,
+    edit: F,
+) -> Result<Profile, String> {
+    let mut store = state.0.lock().unwrap();
+    let Some(profile) = store.config.profiles.iter_mut().find(|p| p.id == id) else {
+        return Err(format!("profile not found: {id}"));
+    };
+    edit(profile);
+    let updated = profile.clone();
+    store.save()?;
+    Ok(updated)
+}
+
+#[tauri::command]
+pub fn rename_profile(
+    state: State<'_, AppState>,
+    id: String,
+    name: String,
+) -> Result<Profile, String> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("profile name must not be empty".to_string());
+    }
+    update(&state, &id, |p| p.name = name)
+}
+
+#[tauri::command]
+pub fn set_profile_muted(
+    state: State<'_, AppState>,
+    id: String,
+    muted: bool,
+) -> Result<Profile, String> {
+    update(&state, &id, |p| p.muted = muted)
 }
 
 // Async because it may close a webview (see the note in webviews.rs).

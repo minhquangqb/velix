@@ -5,12 +5,7 @@ import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
   {
-    ignores: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/target/**',
-      'apps/desktop/src-tauri/gen/**',
-    ],
+    ignores: ['**/node_modules/**', '**/dist/**', '**/target/**', 'apps/desktop/src-tauri/gen/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -20,6 +15,11 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: { parser: tseslint.parser },
     },
+    rules: {
+      // TypeScript resolves globals (DOM lib) already, and vue-tsc runs in CI;
+      // eslint's own no-undef has no type information and only false-positives.
+      'no-undef': 'off',
+    },
   },
-  prettier
+  prettier,
 )

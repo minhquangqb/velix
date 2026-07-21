@@ -15,7 +15,7 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
 - ✅ **Spike multi-webview** (rủi ro số một của Phase 1) — PASS: window tạo bằng code + 2 webview con (`ui` sidebar + `messenger` load mặc định để test hiệu năng) qua `Window::add_child`, cần tauri feature `unstable`. Hạn chế đã biết: `auto_resize()` scale theo tỷ lệ → Phase 1 phải tự reposition khi resize. Capability chỉ cấp IPC cho webview `ui`, webview remote không có quyền
 - ✅ **Design MVP** — đủ 10/10 bề mặt trong Claude Design project (xem mục Design), đã review 2 vòng + verify fix, chốt bàn giao dev. Tồn đọng duy nhất: bug preview nút "Hủy" trong sim của Account Manager (không ảnh hưởng implement)
 - ✅ **Phase 1** — WebView Manager + Profile Manager, commit `feat: add webview and profile managers (Phase 1)`: Rust `config.rs`/`profiles.rs`/`webviews.rs` (storage JSON, IPC `open_webview`/`close_webview`/`focus_webview`/CRUD profile, mỗi profile một `data_directory` riêng dưới `app_data_dir/profiles/<plugin>/<profile>`, tự relayout khi window resize), typed IPC wrapper trong `packages/core`, registry tĩnh + store `profiles` + sidebar UI tối thiểu. User đã verify runtime OK. Bài học quan trọng: **command đụng webview phải là `async fn`** — sync command deadlock trên Windows (wry#583), promise treo không có error
-- 🟡 **Phase 2 — code xong, CHỜ USER VERIFY RUNTIME** — Tray + Notifications + Window state. Đã pass `cargo clippy` (0 warning), `pnpm typecheck`, `pnpm lint`, `pnpm build`; chưa chạy thử GUI.
+- ✅ **Phase 2** — Tray + Notifications + Window state, commit `feat: add tray, notifications and window state (Phase 2)`. User đã verify runtime OK (tray, popup, window state, `Ctrl+Shift+V`).
   - `bridge.rs` — cầu notification từ trang remote. Webview remote **bị ACL chặn IPC** (khác webview local): phải cấp capability lúc runtime. Dùng `InlinedPlugin` tên `velix` (khai trong `build.rs`) với đúng 2 command `notify`/`set_badge`, thay vì app manifest — app manifest sẽ kéo **toàn bộ** command Phase 1 vào ACL. Mỗi webview được `add_capability` riêng, scope theo đúng origin của nó (`https://host/*`), cấp trước khi tạo webview
   - Inject polyfill `window.Notification` + `ServiceWorkerRegistration.showNotification` + `navigator.setAppBadge` (idempotent — WebView2 chạy lại script mỗi lần điều hướng top-level)
   - `tray.rs` — tray icon + popup window custom (`?view=tray`, frameless/transparent/always-on-top, ẩn khi mất focus). **Chiều cao popup tính bên Rust** theo số account chưa đọc → hằng số row height phải khớp `TrayMenu.vue`. Badge tray là chấm đỏ vẽ trực tiếp lên RGBA của icon (icon tray quá nhỏ để hiện số; số nằm trong popup)
@@ -23,7 +23,24 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
   - Đóng cửa sổ = ẩn xuống tray (`closeToTray`, mặc định bật); thoát hẳn chỉ từ popup tray. Autostart + global shortcut `Ctrl+Shift+V`
   - ⚠️ **Notification trên Windows chỉ hiện đúng khi app đã được cài** (WinRT toast cần AppUserModelID từ shortcut Start Menu). Chạy `pnpm tauri dev` sẽ thấy toast mang tên/icon PowerShell — **không phải bug**, muốn verify thật phải build + install
   - ⚠️ Đã nâng `tauri >= 2.11.1` vì CVE-2026-42184 (GHSA-7gmj-67g7-phm9): trên Windows origin remote có thể bị nhận nhầm là local — đúng kịch bản webview remote của Velix
-- Chưa làm: Phase 3 (Workspace UI theo design), Phase 4 (plugin system), Phase 5 (release)
+- 🟡 **Phase 3 — code xong, CHỜ USER VERIFY RUNTIME** — Workspace UI theo design. Đã pass `cargo fmt`/`cargo clippy` (0 warning), `pnpm typecheck`, `pnpm lint`, `pnpm build`; chưa chạy thử GUI.
+  - **Cửa sổ frameless** (`decorations(false)`, min 860×640). Nút min/max/close + drag đi qua `window_ctl.rs`, **không** dùng `@tauri-apps/api/window`: shell chạy trong webview **con**, ở đó JS window API và `data-tauri-drag-region` không được nối. Double-click title bar = maximize (bắt bằng `event.detail === 2`, vì `start_dragging` giao cử chỉ cho OS ngay khi mousedown)
+  - **Hằng số layout phải khớp hai bên**: `RAIL_WIDTH 68` + `ACCOUNTS_WIDTH 248` (= `SIDEBAR_WIDTH 316`) + `TOPBAR_HEIGHT 44` trong `webviews.rs` ↔ `w-17` / `w-62` trong `PlatformRail.vue` / `AccountList.vue` và `h-11` trong `TitleBar.vue`. Webview nền tảng được đặt vào đúng cái lỗ đó
+  - ⚠️ **Webview con luôn vẽ ĐÈ lên webview `ui`** — không thể phủ HTML lên nó. Mọi bề mặt toàn cửa sổ (Settings, Account Manager, Add Account, First-run) phải gọi `hide_webviews` trước; `tabs.detach()` làm việc này và nhớ `resumeProfileId` để quay lại
+  - Stores: `platforms` / `profiles` (data + unread) / `tabs` (vòng đời webview, show/hide **không destroy**) / `settings` / `ui` (routing + trạng thái maximize)
+  - **Theme dark/light** bằng CSS variables `--vx-*` trong `style.css`, `data-theme` stamp lên `<html>` bởi `theme.ts`; `system` bám `prefers-color-scheme`. Tray popup cũng nhận theme qua event `velix://settings`
+  - Event mới: `velix://settings` (settings đổi), `velix://window` (maximize đổi), `velix://navigate` (tray đẩy view sang shell). Tất cả `emit_to` đúng webview `ui`/`tray` — **không bao giờ broadcast**, vì broadcast sẽ lọt sang webview nền tảng remote
+  - Tray "Cài đặt…" / bấm account → command `open_settings` / `open_account`: Rust hiện cửa sổ rồi đẩy `velix://navigate`, **shell tự chuyển webview** để sidebar không lệch trạng thái
+  - Thêm vào config: `settings.theme` (system/dark/light) và `profile.muted` (tắt thông báo từng account; `bridge::notify` kiểm tra cả `quiet` lẫn `muted`). Command mới: `rename_profile`, `set_profile_muted`, `set_theme`, `hide_webviews`
+  - ESLint: `no-undef` tắt cho `**/*.vue` — rule này không có type info nên chỉ báo nhầm `MouseEvent`/`HTMLInputElement`; `vue-tsc` mới là thứ kiểm tra thật
+  - **Lệch design có chủ ý (ghi lại để khỏi tưởng là thiếu sót)**:
+    - **Downloads bỏ hẳn khỏi Phase 3** (user chốt) → tách thành phase riêng, gồm cả UI lẫn intercept phía Rust. Rail không có icon Downloads, Settings không có mục Downloads
+    - Command palette `Ctrl+K` và mục "Cập nhật" trong Settings → Phase 5 (đúng Implementation-Plan)
+    - Add Account bước 3 (webview đăng nhập **nằm trong** wizard) → thay bằng: tạo profile xong nhảy về workspace, trang đăng nhập hiện ở vùng workspace bình thường. Lý do: webview chỉ đặt được vào hình chữ nhật workspace cố định
+    - Chưa làm: kéo-thả sắp xếp account, trạng thái offline/"Thử lại", trạng thái "đang ngủ" (unload webview lâu không dùng — thuộc phần tối ưu RAM Phase 5)
+    - Không nạp Google Fonts (Be Vietnam Pro / Space Grotesk / JetBrains Mono) — app desktop chạy offline, hiện fallback `system-ui`. Muốn đúng chữ thì phải bundle font vào assets
+    - Component dùng chung vẫn nằm ở `apps/desktop/src/components`, chưa đưa sang `packages/ui`: package đó build bằng `tsc` thuần, chưa có pipeline SFC, và mới chỉ có một nơi dùng
+- Chưa làm: Downloads (tách riêng), Phase 4 (plugin system), Phase 5 (release)
 
 ## Design
 

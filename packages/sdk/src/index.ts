@@ -10,6 +10,13 @@ export interface VelixPlugin {
   name: string
   /** Entry URL loaded in the webview */
   url: string
+  /**
+   * Brand colour the shell tints this platform's rail icon and account avatars
+   * with. Declared by the plugin so core never carries platform branding.
+   */
+  tint?: string
+  /** Single character drawn in the rail icon and avatars, e.g. "M" */
+  glyph?: string
   /** CSS injected into the page after load */
   injectCSS?: string
   /** JS injected into the page after load */

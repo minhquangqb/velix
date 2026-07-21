@@ -9,7 +9,9 @@ use std::sync::Mutex;
 
 use tauri::image::Image;
 use tauri::tray::{TrayIcon, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, LogicalSize, Manager, PhysicalPosition, Runtime, WebviewUrl, WindowEvent};
+use tauri::{
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, Runtime, WebviewUrl, WindowEvent,
+};
 
 use crate::{bridge, webviews};
 
@@ -254,6 +256,51 @@ pub async fn show_main_window<R: Runtime>(app: AppHandle<R>) -> Result<(), Strin
     }
     show_main(&app);
     Ok(())
+}
+
+/// Emitted to the shell UI to switch its view; the tray popup is a separate
+/// window and cannot reach the shell's store any other way.
+pub const NAVIGATE_EVENT: &str = "velix://navigate";
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Navigate {
+    pub view: String,
+    /// Set for `view: "account"`, naming the account to bring forward.
+    pub profile_id: Option<String>,
+}
+
+fn navigate<R: Runtime>(
+    app: &AppHandle<R>,
+    view: &str,
+    profile_id: Option<String>,
+) -> Result<(), String> {
+    if let Some(window) = popup(app) {
+        let _ = window.hide();
+    }
+    show_main(app);
+    app.emit_to(
+        webviews::UI_LABEL,
+        NAVIGATE_EVENT,
+        Navigate {
+            view: view.to_string(),
+            profile_id,
+        },
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn open_settings<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    navigate(&app, "settings", None)
+}
+
+/// Brings an account forward from the tray popup. The shell drives the actual
+/// webview switch so its stores stay in step — showing the webview from here
+/// would leave the sidebar highlighting the wrong account.
+#[tauri::command]
+pub async fn open_account<R: Runtime>(app: AppHandle<R>, profile_id: String) -> Result<(), String> {
+    navigate(&app, "account", Some(profile_id))
 }
 
 #[tauri::command]

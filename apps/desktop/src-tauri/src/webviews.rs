@@ -10,7 +10,14 @@ use crate::{bridge, AppState};
 
 pub const UI_LABEL: &str = "ui";
 pub const MAIN_WINDOW: &str = "main";
-pub const SIDEBAR_WIDTH: f64 = 260.0;
+
+/// Chrome geometry, load-bearing: these numbers carve out the hole in the shell
+/// UI that platform webviews are positioned into, so they must match the widths
+/// in `PlatformRail.vue` / `AccountList.vue` and the height of `TitleBar.vue`.
+pub const RAIL_WIDTH: f64 = 68.0;
+pub const ACCOUNTS_WIDTH: f64 = 248.0;
+pub const SIDEBAR_WIDTH: f64 = RAIL_WIDTH + ACCOUNTS_WIDTH;
+pub const TOPBAR_HEIGHT: f64 = 44.0;
 
 /// Only [a-zA-Z0-9-_] so ids stay safe as webview labels and path segments.
 pub fn validate_id(id: &str) -> Result<(), String> {
@@ -45,8 +52,11 @@ fn workspace_bounds<R: Runtime>(
         .inner_size()?
         .to_logical::<f64>(window.scale_factor()?);
     Ok((
-        LogicalPosition::new(SIDEBAR_WIDTH, 0.0),
-        LogicalSize::new((size.width - SIDEBAR_WIDTH).max(0.0), size.height),
+        LogicalPosition::new(SIDEBAR_WIDTH, TOPBAR_HEIGHT),
+        LogicalSize::new(
+            (size.width - SIDEBAR_WIDTH).max(0.0),
+            (size.height - TOPBAR_HEIGHT).max(0.0),
+        ),
     ))
 }
 
@@ -169,6 +179,21 @@ pub async fn focus_webview<R: Runtime>(app: AppHandle<R>, label: String) -> Resu
         return Err(format!("webview not found: {label}"));
     }
     show_only(&window, &label)
+}
+
+/// Hides every platform webview without closing it, so the shell can draw a
+/// full-window surface (settings, wizards) over the workspace area. Native
+/// child webviews always paint above the shell UI, so hiding is the only way to
+/// get them out of the way; the sessions they hold stay alive.
+#[tauri::command]
+pub async fn hide_webviews<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    let window = main_window(&app)?;
+    for webview in window.webviews() {
+        if webview.label() != UI_LABEL {
+            let _ = webview.hide();
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]

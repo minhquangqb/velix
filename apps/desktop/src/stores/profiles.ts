@@ -1,29 +1,41 @@
 import { defineStore } from 'pinia'
 import {
-  closeWebview,
   createProfile,
   deleteProfile,
-  focusWebview,
   listProfiles,
   listUnread,
   onUnread,
-  openWebview,
+  renameProfile,
+  setProfileMuted,
   type Profile,
   type UnreadEntry,
 } from '@velix/core'
 
+/**
+ * The account list and its unread counts. Webview lifecycle lives in the `tabs`
+ * store; this one is pure account data.
+ */
 export const useProfilesStore = defineStore('profiles', {
   state: () => ({
     profiles: [] as Profile[],
-    /** profileId -> webview label, for profiles whose webview is open */
-    openLabels: {} as Record<string, string>,
     /** profileId -> unread count, pushed by the Rust notification bridge */
     unread: {} as Record<string, number>,
-    activeProfileId: null as string | null,
   }),
   getters: {
     byPlugin(state) {
       return (pluginId: string) => state.profiles.filter((p) => p.pluginId === pluginId)
+    },
+    /** Total unread per platform, for the rail badges. */
+    unreadByPlugin(state): Record<string, number> {
+      const totals: Record<string, number> = {}
+      for (const profile of state.profiles) {
+        const count = state.unread[profile.id] ?? 0
+        if (count > 0) totals[profile.pluginId] = (totals[profile.pluginId] ?? 0) + count
+      }
+      return totals
+    },
+    find(state) {
+      return (id: string) => state.profiles.find((p) => p.id === id)
     },
   },
   actions: {
@@ -43,27 +55,20 @@ export const useProfilesStore = defineStore('profiles', {
       this.profiles.push(profile)
       return profile
     },
-    async open(profile: Profile, url: string) {
-      const label = this.openLabels[profile.id]
-      if (label) {
-        await focusWebview(label)
-      } else {
-        this.openLabels[profile.id] = await openWebview(profile.pluginId, profile.id, url)
-      }
-      this.activeProfileId = profile.id
+    async rename(id: string, name: string) {
+      this.replace(await renameProfile(id, name))
     },
-    async close(profileId: string) {
-      const label = this.openLabels[profileId]
-      if (!label) return
-      await closeWebview(label)
-      delete this.openLabels[profileId]
-      if (this.activeProfileId === profileId) this.activeProfileId = null
+    async setMuted(id: string, muted: boolean) {
+      this.replace(await setProfileMuted(id, muted))
     },
-    async remove(profileId: string) {
-      await deleteProfile(profileId)
-      delete this.openLabels[profileId]
-      if (this.activeProfileId === profileId) this.activeProfileId = null
-      this.profiles = this.profiles.filter((p) => p.id !== profileId)
+    async remove(id: string) {
+      await deleteProfile(id)
+      this.profiles = this.profiles.filter((p) => p.id !== id)
+      delete this.unread[id]
+    },
+    replace(profile: Profile) {
+      const index = this.profiles.findIndex((p) => p.id === profile.id)
+      if (index >= 0) this.profiles[index] = profile
     },
   },
 })

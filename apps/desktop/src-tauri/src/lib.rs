@@ -4,6 +4,7 @@ mod profiles;
 mod settings;
 mod tray;
 mod webviews;
+mod window_ctl;
 mod window_state;
 
 use std::sync::Mutex;
@@ -63,10 +64,13 @@ pub fn run() {
                 store.config.window.clone()
             };
 
+            // Frameless: the design draws its own title bar. Window controls and
+            // the drag region live in `window_ctl.rs` / `TitleBar.vue`.
             let mut builder = WindowBuilder::new(app, webviews::MAIN_WINDOW)
                 .title("Velix")
+                .decorations(false)
                 .inner_size(saved.width, saved.height)
-                .min_inner_size(800.0, 600.0)
+                .min_inner_size(860.0, 640.0)
                 .visible(!launched_by_autostart());
             builder = match (saved.x, saved.y) {
                 (Some(x), Some(y)) => builder.position(x, y),
@@ -96,6 +100,8 @@ pub fn run() {
                 WindowEvent::Resized(_) => {
                     webviews::relayout(&handle);
                     window_state::capture(&handle);
+                    // Maximising arrives as a resize; the title bar glyph follows.
+                    window_ctl::publish(&handle);
                 }
                 WindowEvent::Moved(_) => window_state::capture(&handle),
                 WindowEvent::CloseRequested { api, .. } => {
@@ -120,15 +126,26 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             profiles::list_profiles,
             profiles::create_profile,
+            profiles::rename_profile,
+            profiles::set_profile_muted,
             profiles::delete_profile,
             webviews::open_webview,
             webviews::focus_webview,
+            webviews::hide_webviews,
             webviews::close_webview,
+            window_ctl::window_is_maximized,
+            window_ctl::window_minimize,
+            window_ctl::window_toggle_maximize,
+            window_ctl::window_close,
+            window_ctl::window_start_drag,
             settings::get_settings,
+            settings::set_theme,
             settings::set_quiet,
             settings::set_close_to_tray,
             settings::set_autostart,
             tray::show_main_window,
+            tray::open_settings,
+            tray::open_account,
             tray::hide_tray_popup,
             tray::list_unread,
             tray::quit_app,

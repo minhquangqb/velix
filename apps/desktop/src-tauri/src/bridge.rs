@@ -272,7 +272,8 @@ pub async fn notify<R: Runtime>(
     bump_unread(&app, &label);
     publish(&app);
 
-    if !quiet {
+    // Global quiet mode and the per-account mute both silence only the toast.
+    if !quiet && !profile.muted {
         let heading = if title.trim().is_empty() {
             profile.name
         } else {

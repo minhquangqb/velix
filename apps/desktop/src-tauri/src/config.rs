@@ -8,6 +8,9 @@ pub struct Profile {
     pub id: String,
     pub plugin_id: String,
     pub name: String,
+    /// Suppresses this account's native notifications; its badge keeps counting.
+    #[serde(default)]
+    pub muted: bool,
 }
 
 /// Last known geometry of the main window, restored on the next launch.
@@ -34,9 +37,21 @@ impl Default for WindowState {
     }
 }
 
+/// Which palette the shell renders in. `System` follows the OS light/dark setting.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Theme {
+    #[default]
+    System,
+    Dark,
+    Light,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    #[serde(default)]
+    pub theme: Theme,
     /// Suppresses native notifications; unread badges keep updating.
     #[serde(default)]
     pub quiet: bool,
@@ -50,6 +65,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            theme: Theme::System,
             quiet: false,
             close_to_tray: true,
             autostart: false,

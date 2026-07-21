@@ -1,9 +1,15 @@
 //! App settings exposed to the shell UI and the tray popup.
 
-use tauri::{AppHandle, Manager, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use tauri_plugin_autostart::ManagerExt;
 
-use crate::config::Settings;
+use crate::{tray, webviews};
+
+/// Emitted after any settings change so every local surface (shell UI and tray
+/// popup) re-themes and re-renders its toggles without polling.
+pub const SETTINGS_EVENT: &str = "velix://settings";
+
+use crate::config::{Settings, Theme};
 use crate::AppState;
 
 #[tauri::command]
@@ -15,11 +21,23 @@ fn update<R: Runtime, F: FnOnce(&mut Settings)>(
     app: &AppHandle<R>,
     apply: F,
 ) -> Result<Settings, String> {
-    let state = app.state::<AppState>();
-    let mut store = state.0.lock().unwrap();
-    apply(&mut store.config.settings);
-    store.save()?;
-    Ok(store.config.settings.clone())
+    let settings = {
+        let state = app.state::<AppState>();
+        let mut store = state.0.lock().unwrap();
+        apply(&mut store.config.settings);
+        store.save()?;
+        store.config.settings.clone()
+    };
+
+    // Targeted, not broadcast: remote platform webviews must not see settings.
+    let _ = app.emit_to(webviews::UI_LABEL, SETTINGS_EVENT, &settings);
+    let _ = app.emit_to(tray::POPUP_WINDOW, SETTINGS_EVENT, &settings);
+    Ok(settings)
+}
+
+#[tauri::command]
+pub async fn set_theme<R: Runtime>(app: AppHandle<R>, theme: Theme) -> Result<Settings, String> {
+    update(&app, |s| s.theme = theme)
 }
 
 #[tauri::command]
