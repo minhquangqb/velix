@@ -92,8 +92,10 @@ pub fn close_by_label<R: Runtime>(app: &AppHandle<R>, label: &str) -> Result<(),
     Ok(())
 }
 
+// Webview-touching commands must be async: a sync command would block the main
+// thread while webview creation is dispatched to it — deadlock on Windows (wry#583).
 #[tauri::command]
-pub fn open_webview<R: Runtime>(
+pub async fn open_webview<R: Runtime>(
     app: AppHandle<R>,
     state: tauri::State<'_, AppState>,
     plugin_id: String,
@@ -140,7 +142,7 @@ pub fn open_webview<R: Runtime>(
 }
 
 #[tauri::command]
-pub fn focus_webview<R: Runtime>(app: AppHandle<R>, label: String) -> Result<(), String> {
+pub async fn focus_webview<R: Runtime>(app: AppHandle<R>, label: String) -> Result<(), String> {
     let window = main_window(&app)?;
     if !window.webviews().iter().any(|w| w.label() == label) {
         return Err(format!("webview not found: {label}"));
@@ -149,7 +151,7 @@ pub fn focus_webview<R: Runtime>(app: AppHandle<R>, label: String) -> Result<(),
 }
 
 #[tauri::command]
-pub fn close_webview<R: Runtime>(app: AppHandle<R>, label: String) -> Result<(), String> {
+pub async fn close_webview<R: Runtime>(app: AppHandle<R>, label: String) -> Result<(), String> {
     if label == UI_LABEL {
         return Err("cannot close the ui webview".to_string());
     }

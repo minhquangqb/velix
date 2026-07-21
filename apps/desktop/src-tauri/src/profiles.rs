@@ -42,8 +42,9 @@ pub fn create_profile(
     Ok(profile)
 }
 
+// Async because it may close a webview (see the note in webviews.rs).
 #[tauri::command]
-pub fn delete_profile<R: Runtime>(
+pub async fn delete_profile<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
     id: String,
