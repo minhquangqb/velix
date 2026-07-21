@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { SlidersHorizontal } from '@lucide/vue'
 import type { VelixPlugin } from '@velix/core'
 
 import GlyphBadge from './GlyphBadge.vue'
-import { pluginGlyph, pluginTint } from '../registry'
+import { pluginMark } from '../registry'
 import { usePlatformsStore } from '../stores/platforms'
 import { useProfilesStore } from '../stores/profiles'
 import { useUiStore } from '../stores/ui'
@@ -52,8 +53,7 @@ function badge(pluginId: string) {
         :class="platforms.activeId === plugin.id ? 'h-6 opacity-100' : 'h-0 opacity-0'"
       />
       <GlyphBadge
-        :glyph="pluginGlyph(plugin)"
-        :tint="pluginTint(plugin)"
+        v-bind="pluginMark(plugin)"
         :size="42"
         :radius="13"
         :selected="platforms.activeId === plugin.id"
@@ -82,30 +82,7 @@ function badge(pluginId: string) {
       title="Cài đặt"
       @click="ui.goto('settings')"
     >
-      <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true">
-        <path
-          d="M2.5 5h12M2.5 12h12"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-        />
-        <circle
-          cx="11"
-          cy="5"
-          r="1.9"
-          :fill="'var(--vx-rail)'"
-          stroke="currentColor"
-          stroke-width="1.5"
-        />
-        <circle
-          cx="6"
-          cy="12"
-          r="1.9"
-          :fill="'var(--vx-rail)'"
-          stroke="currentColor"
-          stroke-width="1.5"
-        />
-      </svg>
+      <SlidersHorizontal :size="17" :stroke-width="1.7" aria-hidden="true" />
     </button>
   </nav>
 </template>

@@ -4,7 +4,7 @@ import type { VelixPlugin } from '@velix/core'
 
 import GlyphBadge from '../components/GlyphBadge.vue'
 import TitleBar from '../components/TitleBar.vue'
-import { PLUGINS, pluginDomain, pluginGlyph, pluginTint } from '../registry'
+import { PLUGINS, pluginDomain, pluginMark } from '../registry'
 import { usePlatformsStore } from '../stores/platforms'
 import { useProfilesStore } from '../stores/profiles'
 import { useTabsStore } from '../stores/tabs'
@@ -147,13 +147,7 @@ async function submit() {
             :style="{ background: 'var(--vx-card)', border: '1px solid var(--vx-card-border)' }"
             @click="pick(plugin)"
           >
-            <GlyphBadge
-              class="mx-auto"
-              :glyph="pluginGlyph(plugin)"
-              :tint="pluginTint(plugin)"
-              :size="46"
-              :radius="14"
-            />
+            <GlyphBadge class="mx-auto" v-bind="pluginMark(plugin)" :size="46" :radius="14" />
             <p class="mt-3 text-[13px] font-semibold">{{ plugin.name }}</p>
             <p class="mt-0.5 text-[11px]" :style="{ color: 'var(--vx-text-4)' }">
               {{ pluginDomain(plugin) }}
@@ -173,13 +167,7 @@ async function submit() {
 
       <!-- Step 2 -->
       <div v-else class="vx-fade w-115 max-w-full text-center">
-        <GlyphBadge
-          class="mx-auto"
-          :glyph="pluginGlyph(picked)"
-          :tint="pluginTint(picked)"
-          :size="52"
-          :radius="16"
-        />
+        <GlyphBadge class="mx-auto" v-bind="pluginMark(picked)" :size="52" :radius="16" />
         <h1 class="mt-4.5 mb-2 font-display text-[22px] font-bold">
           Đặt tên cho tài khoản {{ picked.name }}
         </h1>

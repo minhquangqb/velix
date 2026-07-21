@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import GlyphBadge from '../components/GlyphBadge.vue'
 import TitleBar from '../components/TitleBar.vue'
-import { PLUGINS, pluginGlyph, pluginTint } from '../registry'
+import { PLUGINS, pluginMark } from '../registry'
 import { useUiStore } from '../stores/ui'
 
 const ui = useUiStore()
@@ -58,8 +58,7 @@ const ui = useUiStore()
                 <GlyphBadge
                   v-for="plugin in PLUGINS"
                   :key="plugin.id"
-                  :glyph="pluginGlyph(plugin)"
-                  :tint="pluginTint(plugin)"
+                  v-bind="pluginMark(plugin)"
                   :size="32"
                   :radius="10"
                 />

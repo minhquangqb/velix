@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import type { Profile, VelixPlugin } from '@velix/core'
 
+import { Plus } from '@lucide/vue'
+
 import AccountList from '../components/AccountList.vue'
 import PlatformRail from '../components/PlatformRail.vue'
 import TitleBar from '../components/TitleBar.vue'
@@ -98,14 +100,7 @@ function selectAccount(profile: Profile) {
                 color: #6474ee;
               "
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path
-                  d="M8 2.5v11M2.5 8h11"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                />
-              </svg>
+              <Plus :size="17" :stroke-width="1.9" aria-hidden="true" />
             </div>
             <p class="mb-1.25 text-[14px] font-bold">Chưa có tài khoản {{ platformName }}</p>
             <p class="mb-4 text-[12.5px] leading-relaxed" :style="{ color: 'var(--vx-text-3)' }">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronRight, Copy, Minus, Square, X } from '@lucide/vue'
 import { windowClose, windowMinimize, windowStartDrag, windowToggleMaximize } from '@velix/core'
 
 import { useUiStore } from '../stores/ui'
@@ -33,15 +34,7 @@ function onDragMouseDown(event: MouseEvent) {
     <div class="flex h-full flex-1 items-center gap-2 text-[12.5px]" @mousedown="onDragMouseDown">
       <span :style="{ color: 'var(--vx-text-3)' }">Velix</span>
       <template v-for="(crumb, index) in crumbs" :key="index">
-        <svg width="5" height="8" viewBox="0 0 5 8" class="opacity-30" aria-hidden="true">
-          <path
-            d="M1 1l3 3-3 3"
-            stroke="currentColor"
-            stroke-width="1.3"
-            fill="none"
-            stroke-linecap="round"
-          />
-        </svg>
+        <ChevronRight :size="13" :stroke-width="1.6" class="opacity-30" aria-hidden="true" />
         <span :class="index === crumbs.length - 1 ? 'font-bold' : ''">{{ crumb }}</span>
       </template>
       <slot name="status" />
@@ -55,9 +48,7 @@ function onDragMouseDown(event: MouseEvent) {
         :style="{ color: 'var(--vx-text-3)' }"
         @click="windowMinimize()"
       >
-        <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true">
-          <path d="M1.5 5.5h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-        </svg>
+        <Minus :size="15" :stroke-width="1.6" aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -66,38 +57,8 @@ function onDragMouseDown(event: MouseEvent) {
         :style="{ color: 'var(--vx-text-3)' }"
         @click="windowToggleMaximize()"
       >
-        <svg v-if="!ui.maximized" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-          <rect
-            x="1.2"
-            y="1.2"
-            width="7.6"
-            height="7.6"
-            rx="1"
-            stroke="currentColor"
-            stroke-width="1.3"
-            fill="none"
-          />
-        </svg>
-        <svg v-else width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-          <rect
-            x="1.2"
-            y="3"
-            width="5.8"
-            height="5.8"
-            rx="1"
-            stroke="currentColor"
-            stroke-width="1.3"
-            fill="none"
-          />
-          <path
-            d="M3.4 3V1.2h5.4V6.6H7"
-            stroke="currentColor"
-            stroke-width="1.3"
-            fill="none"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
+        <Square v-if="!ui.maximized" :size="12" :stroke-width="1.8" aria-hidden="true" />
+        <Copy v-else :size="13" :stroke-width="1.7" aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -106,14 +67,7 @@ function onDragMouseDown(event: MouseEvent) {
         :style="{ color: 'var(--vx-text-3)' }"
         @click="windowClose()"
       >
-        <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true">
-          <path
-            d="M1.5 1.5l8 8M9.5 1.5l-8 8"
-            stroke="currentColor"
-            stroke-width="1.3"
-            stroke-linecap="round"
-          />
-        </svg>
+        <X :size="15" :stroke-width="1.6" aria-hidden="true" />
       </button>
     </div>
   </header>

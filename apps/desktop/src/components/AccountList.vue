@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import type { Profile } from '@velix/core'
 
 import GlyphBadge from './GlyphBadge.vue'
+import { List, Plus } from '@lucide/vue'
+
 import { pluginTint } from '../registry'
 import { usePlatformsStore } from '../stores/platforms'
 import { useProfilesStore } from '../stores/profiles'
@@ -49,14 +51,7 @@ function subtitle(profile: Profile) {
         title="Thêm tài khoản"
         @click="ui.goto('add-account', platforms.activeId)"
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-          <path
-            d="M6 1.5v9M1.5 6h9"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-          />
-        </svg>
+        <Plus :size="13" :stroke-width="2" aria-hidden="true" />
       </button>
     </div>
 
@@ -139,14 +134,7 @@ function subtitle(profile: Profile) {
             color: #8a97fa;
           "
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              d="M8 2.5v11M2.5 8h11"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-            />
-          </svg>
+          <Plus :size="17" :stroke-width="1.9" aria-hidden="true" />
         </div>
         <p class="mb-1.25 text-[13.5px] font-bold">Chưa có tài khoản</p>
         <p class="mb-4 text-[12px] leading-relaxed" :style="{ color: 'var(--vx-text-3)' }">
@@ -179,14 +167,7 @@ function subtitle(profile: Profile) {
       }"
       @click="ui.goto('accounts')"
     >
-      <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true">
-        <path
-          d="M2 3.5h9M2 6.5h9M2 9.5h5"
-          stroke="currentColor"
-          stroke-width="1.4"
-          stroke-linecap="round"
-        />
-      </svg>
+      <List :size="14" :stroke-width="1.7" aria-hidden="true" />
       <span>Quản lý tài khoản</span>
     </button>
   </aside>

@@ -32,6 +32,11 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
   - Event mới: `velix://settings` (settings đổi), `velix://window` (maximize đổi), `velix://navigate` (tray đẩy view sang shell). Tất cả `emit_to` đúng webview `ui`/`tray` — **không bao giờ broadcast**, vì broadcast sẽ lọt sang webview nền tảng remote
   - Tray "Cài đặt…" / bấm account → command `open_settings` / `open_account`: Rust hiện cửa sổ rồi đẩy `velix://navigate`, **shell tự chuyển webview** để sidebar không lệch trạng thái
   - Thêm vào config: `settings.theme` (system/dark/light) và `profile.muted` (tắt thông báo từng account; `bridge::notify` kiểm tra cả `quiet` lẫn `muted`). Command mới: `rename_profile`, `set_profile_muted`, `set_theme`, `hide_webviews`
+  - **Icon**: UI dùng [Lucide](https://lucide.dev) qua `@lucide/vue` (MIT, tree-shake theo từng import). ⚠️ Package cũ `lucide-vue-next` đã **deprecated** → luôn dùng `@lucide/vue`. Stroke mặc định 2px, design dùng 1.2–1.7px nên chỗ nào cũng set `:stroke-width` tường minh
+  - **Logo nền tảng**: path SVG copy từ Simple Icons (CC0) và **inline vào `src/brands.ts`** — không giữ package `simple-icons` làm dependency vì chỉ cần 3 path trên tổng 3000 icon. `GlyphBadge` nhận theo thứ tự ưu tiên `path` (brand, fill) → `icon` (component Lucide, stroke) → `glyph` (chữ cái). Ô badge tint/bo góc giữ nguyên như design
+  - ⚠️ **ChatGPT không có logo**: Simple Icons đã gỡ OpenAI vì chính sách nhãn hiệu, và vẽ tay logo từ trí nhớ sẽ ra sai. Tạm dùng icon `Sparkles` của Lucide (khai trong `FALLBACK_ICONS` ở `registry.ts`). Muốn logo thật thì tự lấy SVG chính chủ bỏ vào `BRAND_PATHS.chatgpt`, badge sẽ tự ưu tiên nó
+  - Logo là nhãn hiệu của chủ sở hữu; CC0 chỉ áp cho dữ liệu vector. Bình thường với app dạng này (Rambox/Ferdi đều làm) nhưng nên rà lại nếu phát hành thương mại
+  - Avatar tài khoản vẫn là **chữ cái đầu của tên tài khoản** (do user đặt), chỉ badge **nền tảng** mới dùng logo
   - ESLint: `no-undef` tắt cho `**/*.vue` — rule này không có type info nên chỉ báo nhầm `MouseEvent`/`HTMLInputElement`; `vue-tsc` mới là thứ kiểm tra thật
   - **Lệch design có chủ ý (ghi lại để khỏi tưởng là thiếu sót)**:
     - **Downloads bỏ hẳn khỏi Phase 3** (user chốt) → tách thành phase riêng, gồm cả UI lẫn intercept phía Rust. Rail không có icon Downloads, Settings không có mục Downloads

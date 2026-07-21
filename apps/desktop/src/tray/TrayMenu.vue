@@ -12,7 +12,10 @@ import {
   showMainWindow,
   type UnreadEntry,
 } from '@velix/core'
-import { PLUGINS, pluginTint } from '../registry'
+import { Bell, LogOut, SlidersHorizontal } from '@lucide/vue'
+
+import GlyphBadge from '../components/GlyphBadge.vue'
+import { PLUGINS, findPlugin, pluginMark } from '../registry'
 
 /**
  * Row heights are load-bearing: the popup window is sized in Rust
@@ -29,11 +32,6 @@ const visible = computed(() => entries.value.slice(0, MAX_VISIBLE_ACCOUNTS))
 
 function pluginName(pluginId: string) {
   return PLUGINS.find((p) => p.id === pluginId)?.name ?? pluginId
-}
-
-/** Brand tint comes from the plugin manifest, same as the shell's avatars. */
-function tint(pluginId: string) {
-  return pluginTint(PLUGINS.find((p) => p.id === pluginId))
 }
 
 let unlistenSettings: (() => void) | null = null
@@ -119,16 +117,7 @@ async function showSettings() {
             class="flex h-9.5 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 hover:bg-(--vx-ghost)"
             @click="showAccount(entry)"
           >
-            <span
-              class="grid h-6.5 w-6.5 shrink-0 place-items-center rounded-lg text-[11px] font-bold"
-              :style="{
-                color: tint(entry.pluginId),
-                background: `color-mix(in srgb, ${tint(entry.pluginId)} 11%, transparent)`,
-                boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${tint(entry.pluginId)} 19%, transparent)`,
-              }"
-            >
-              {{ pluginName(entry.pluginId).charAt(0).toUpperCase() }}
-            </span>
+            <GlyphBadge v-bind="pluginMark(findPlugin(entry.pluginId))" :size="26" :radius="8" />
             <span class="min-w-0 flex-1 text-left">
               <span class="block truncate text-[12.5px] leading-tight font-semibold">
                 {{ entry.name }}
@@ -156,16 +145,7 @@ async function showSettings() {
         @click="toggleQuiet()"
       >
         <span class="grid w-5.5 place-items-center" :style="{ color: 'var(--vx-text-2)' }">
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <path
-              d="M4 5.5a3 3 0 016 0c0 2.4.9 3 .9 3H3.1s.9-.6.9-3zM5.9 10.8a1.2 1.2 0 002.2 0"
-              stroke="currentColor"
-              stroke-width="1.2"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <Bell :size="14" :stroke-width="1.6" aria-hidden="true" />
         </span>
         <span class="flex-1 text-left text-[12.5px] font-medium">Tạm tắt thông báo</span>
         <span
@@ -184,30 +164,7 @@ async function showSettings() {
         @click="showSettings()"
       >
         <span class="grid w-5.5 place-items-center" :style="{ color: 'var(--vx-text-2)' }">
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <path
-              d="M2 4h10M2 10h10"
-              stroke="currentColor"
-              stroke-width="1.2"
-              stroke-linecap="round"
-            />
-            <circle
-              cx="9"
-              cy="4"
-              r="1.6"
-              fill="var(--vx-panel)"
-              stroke="currentColor"
-              stroke-width="1.2"
-            />
-            <circle
-              cx="5"
-              cy="10"
-              r="1.6"
-              fill="var(--vx-panel)"
-              stroke="currentColor"
-              stroke-width="1.2"
-            />
-          </svg>
+          <SlidersHorizontal :size="14" :stroke-width="1.6" aria-hidden="true" />
         </span>
         <span class="text-[12.5px] font-medium">Cài đặt…</span>
       </button>
@@ -220,16 +177,7 @@ async function showSettings() {
         @click="quitApp()"
       >
         <span class="grid w-5.5 place-items-center">
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <path
-              d="M5.5 2H3a1 1 0 00-1 1v8a1 1 0 001 1h2.5M9 4.5L11.5 7 9 9.5M11.5 7H5.5"
-              stroke="currentColor"
-              stroke-width="1.2"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <LogOut :size="14" :stroke-width="1.6" aria-hidden="true" />
         </span>
         <span class="text-[12.5px] font-medium">Thoát hẳn Velix</span>
       </button>

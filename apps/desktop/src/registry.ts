@@ -1,4 +1,17 @@
+import { Sparkles } from '@lucide/vue'
+import type { Component } from 'vue'
 import type { VelixPlugin } from '@velix/core'
+
+import { brandPath } from './brands'
+
+/**
+ * Stand-in marks for platforms with no usable brand path. ChatGPT is the only
+ * one today: Simple Icons dropped OpenAI over trademark policy, and drawing the
+ * mark from memory would just produce a wrong logo.
+ */
+const FALLBACK_ICONS: Record<string, Component> = {
+  chatgpt: Sparkles,
+}
 
 /**
  * Static plugin registry until the real plugin system lands in Phase 4.
@@ -54,4 +67,14 @@ export function pluginTint(plugin: VelixPlugin | undefined): string {
 
 export function pluginGlyph(plugin: VelixPlugin | undefined): string {
   return plugin?.glyph ?? plugin?.name.charAt(0).toUpperCase() ?? '?'
+}
+
+/** Everything GlyphBadge needs to draw a platform, in its precedence order. */
+export function pluginMark(plugin: VelixPlugin | undefined) {
+  return {
+    path: plugin ? brandPath(plugin.id) : undefined,
+    icon: plugin ? FALLBACK_ICONS[plugin.id] : undefined,
+    glyph: pluginGlyph(plugin),
+    tint: pluginTint(plugin),
+  }
 }

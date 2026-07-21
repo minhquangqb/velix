@@ -4,7 +4,9 @@ import type { Profile } from '@velix/core'
 
 import GlyphBadge from '../components/GlyphBadge.vue'
 import TitleBar from '../components/TitleBar.vue'
-import { PLUGINS, pluginTint } from '../registry'
+import { Bell, BellOff, Pencil, Plus, Trash2 } from '@lucide/vue'
+
+import { PLUGINS, pluginMark, pluginTint } from '../registry'
 import { useProfilesStore } from '../stores/profiles'
 import { useTabsStore } from '../stores/tabs'
 import { useUiStore } from '../stores/ui'
@@ -94,12 +96,7 @@ function confirmDelete() {
 
         <section v-for="group in groups" :key="group.plugin.id" class="mb-5.5">
           <div class="mb-2.25 flex items-center gap-2.25">
-            <GlyphBadge
-              :glyph="group.plugin.glyph ?? group.plugin.name.charAt(0)"
-              :tint="pluginTint(group.plugin)"
-              :size="24"
-              :radius="7"
-            />
+            <GlyphBadge v-bind="pluginMark(group.plugin)" :size="24" :radius="7" />
             <span
               class="text-[12px] font-bold tracking-[0.06em] uppercase"
               :style="{ color: 'var(--vx-text-2)' }"
@@ -172,23 +169,12 @@ function confirmDelete() {
                 :title="profile.muted ? 'Bật lại thông báo' : 'Tắt thông báo tài khoản này'"
                 @click="run(() => profiles.setMuted(profile.id, !profile.muted))"
               >
-                <svg width="15" height="15" viewBox="0 0 15 15" aria-hidden="true">
-                  <path
-                    d="M4.5 6a3 3 0 016 0c0 2.6 1 3.3 1 3.3h-8s1-.7 1-3.3zM6.3 11.5a1.3 1.3 0 002.4 0"
-                    stroke="currentColor"
-                    stroke-width="1.3"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                  <path
-                    v-if="profile.muted"
-                    d="M2 2l11 11"
-                    stroke="currentColor"
-                    stroke-width="1.3"
-                    stroke-linecap="round"
-                  />
-                </svg>
+                <component
+                  :is="profile.muted ? BellOff : Bell"
+                  :size="16"
+                  :stroke-width="1.7"
+                  aria-hidden="true"
+                />
               </button>
 
               <button
@@ -198,15 +184,7 @@ function confirmDelete() {
                 title="Đổi tên"
                 @click="startRename(profile)"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-                  <path
-                    d="M9.5 2.5l2 2L5 11l-2.6.6L3 9z"
-                    stroke="currentColor"
-                    stroke-width="1.3"
-                    fill="none"
-                    stroke-linejoin="round"
-                  />
-                </svg>
+                <Pencil :size="15" :stroke-width="1.7" aria-hidden="true" />
               </button>
 
               <button
@@ -216,16 +194,7 @@ function confirmDelete() {
                 title="Xóa tài khoản"
                 @click="askDelete(profile)"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-                  <path
-                    d="M2.5 3.5h9M5.5 3.5v-1h3v1M4 3.5l.5 8h5l.5-8M6 6v3.5M8 6v3.5"
-                    stroke="currentColor"
-                    stroke-width="1.2"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
+                <Trash2 :size="15" :stroke-width="1.7" aria-hidden="true" />
               </button>
             </div>
 
@@ -255,14 +224,7 @@ function confirmDelete() {
           :style="{ color: 'var(--vx-text-2)', border: '1px dashed var(--vx-input-border)' }"
           @click="ui.goto('add-account')"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-            <path
-              d="M6 1.5v9M1.5 6h9"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
-          </svg>
+          <Plus :size="13" :stroke-width="2" aria-hidden="true" />
           Thêm tài khoản
         </button>
       </div>
@@ -295,16 +257,7 @@ function confirmDelete() {
               color: #f2555a;
             "
           >
-            <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true">
-              <path
-                d="M3 4.5h11M7 4.5v-1.5h3v1.5M4.8 4.5l.6 9.5h6.2l.6-9.5M7.2 7.5v4M9.8 7.5v4"
-                stroke="currentColor"
-                stroke-width="1.3"
-                fill="none"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+            <Trash2 :size="19" :stroke-width="1.6" aria-hidden="true" />
           </div>
           <div class="min-w-0">
             <p class="truncate font-display text-[16px] font-bold">
