@@ -6,6 +6,15 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
 
 - [docs/Velix-Project-Plan.md](docs/Velix-Project-Plan.md) — vision, architecture, roadmap
 - [docs/Implementation-Plan.md](docs/Implementation-Plan.md) — kế hoạch triển khai theo phase; luôn làm đúng phase đang được yêu cầu, không làm trước phase sau
+- [docs/Feature-Spec-For-Design.md](docs/Feature-Spec-For-Design.md) — spec tính năng bàn giao cho design (không mô tả visual)
+- [docs/references/pake-learnings.md](docs/references/pake-learnings.md) — kỹ thuật tham khảo từ Pake (tw93/Pake, MIT): notification/badge polyfill, OAuth trong webview, link/download interception, native zoom, config schema — đọc khi làm inject baseline trong core/sdk hoặc plugin
+
+## Design
+
+- Claude Design project "Velix main screen review": https://claude.ai/design/p/4bd8b925-f564-40ab-9865-d8f5a2280472?file=Velix+Main+v2.dc.html
+  - Đọc qua tool DesignSync (projectId `4bd8b925-f564-40ab-9865-d8f5a2280472`); file mới nhất: `Velix Main v2.dc.html`
+  - Lưu ý: design dùng cửa sổ frameless (nút min/max/close custom) — implement cần `decorations: false` + vùng drag ở cạnh trên
+  - Tray menu: đã chốt implement bằng custom popup window (không dùng native tray menu) để giữ đúng design (toggle, kbd hint, badge) — làm trong Phase 2
 
 ## Tech stack
 
