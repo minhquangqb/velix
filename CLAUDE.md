@@ -9,6 +9,14 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
 - [docs/Feature-Spec-For-Design.md](docs/Feature-Spec-For-Design.md) — spec tính năng bàn giao cho design (không mô tả visual)
 - [docs/references/pake-learnings.md](docs/references/pake-learnings.md) — kỹ thuật tham khảo từ Pake (tw93/Pake, MIT): notification/badge polyfill, OAuth trong webview, link/download interception, native zoom, config schema — đọc khi làm inject baseline trong core/sdk hoặc plugin
 
+## Tiến độ (cập nhật 2026-07-21)
+
+- ✅ **Phase 0** — scaffold monorepo, commit `feat: scaffold monorepo` (verify: build/typecheck/lint/cargo check pass, `pnpm tauri dev` mở được cửa sổ)
+- ✅ **Spike multi-webview** (rủi ro số một của Phase 1) — PASS: window tạo bằng code + 2 webview con (`ui` sidebar + `messenger` load mặc định để test hiệu năng) qua `Window::add_child`, cần tauri feature `unstable`. Hạn chế đã biết: `auto_resize()` scale theo tỷ lệ → Phase 1 phải tự reposition khi resize. Capability chỉ cấp IPC cho webview `ui`, webview remote không có quyền
+- ✅ **Design MVP** — đủ 10/10 bề mặt trong Claude Design project (xem mục Design), đã review 2 vòng + verify fix, chốt bàn giao dev. Tồn đọng duy nhất: bug preview nút "Hủy" trong sim của Account Manager (không ảnh hưởng implement)
+- ⏭️ **Tiếp theo: Phase 1** — WebView Manager + Profile Manager (xóa hardcode messenger trong `lib.rs`, thay bằng manager tổng quát + registry tĩnh). DoD: Messenger 2 profile login không đè nhau
+- Chưa làm: Phase 2 (tray/notifications/window state), Phase 3 (Workspace UI theo design), Phase 4 (plugin system), Phase 5 (release)
+
 ## Design
 
 - Claude Design project "Velix main screen review": https://claude.ai/design/p/4bd8b925-f564-40ab-9865-d8f5a2280472?file=Velix+Main+v2.dc.html
