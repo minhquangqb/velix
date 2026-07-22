@@ -19,6 +19,35 @@ pub const ACCOUNTS_WIDTH: f64 = 248.0;
 pub const SIDEBAR_WIDTH: f64 = RAIL_WIDTH + ACCOUNTS_WIDTH;
 pub const TOPBAR_HEIGHT: f64 = 44.0;
 
+/// Left edge of the workspace hole. When the account list is collapsed the shell
+/// hides it and only the rail stays, so the hole starts at the rail's edge. Read
+/// from config because the platform webviews are positioned by Rust, not the
+/// shell CSS, and the collapse preference is persisted across runs.
+fn sidebar_offset<R: Runtime>(window: &Window<R>) -> f64 {
+    let collapsed = window
+        .app_handle()
+        .state::<AppState>()
+        .0
+        .lock()
+        .unwrap()
+        .config
+        .settings
+        .sidebar_collapsed;
+    if collapsed {
+        RAIL_WIDTH
+    } else {
+        SIDEBAR_WIDTH
+    }
+}
+
+/// Repositions platform webviews for the main window after a layout preference
+/// (e.g. the sidebar collapse) changes. Called from `settings.rs`.
+pub fn relayout_app<R: Runtime>(app: &AppHandle<R>) {
+    if let Ok(window) = main_window(app) {
+        relayout(&window);
+    }
+}
+
 /// Only [a-zA-Z0-9-_] so ids stay safe as webview labels and path segments.
 pub fn validate_id(id: &str) -> Result<(), String> {
     if !id.is_empty()
@@ -51,10 +80,11 @@ fn workspace_bounds<R: Runtime>(
     let size = window
         .inner_size()?
         .to_logical::<f64>(window.scale_factor()?);
+    let left = sidebar_offset(window);
     Ok((
-        LogicalPosition::new(SIDEBAR_WIDTH, TOPBAR_HEIGHT),
+        LogicalPosition::new(left, TOPBAR_HEIGHT),
         LogicalSize::new(
-            (size.width - SIDEBAR_WIDTH).max(0.0),
+            (size.width - left).max(0.0),
             (size.height - TOPBAR_HEIGHT).max(0.0),
         ),
     ))

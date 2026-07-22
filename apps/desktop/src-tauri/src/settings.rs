@@ -53,6 +53,19 @@ pub async fn set_close_to_tray<R: Runtime>(
     update(&app, |s| s.close_to_tray = close_to_tray)
 }
 
+/// Persists the sidebar collapse preference, then repositions the platform
+/// webviews to the new workspace rectangle. Async like every webview-touching
+/// command (a sync one deadlocks on Windows, wry#583).
+#[tauri::command]
+pub async fn set_sidebar_collapsed<R: Runtime>(
+    app: AppHandle<R>,
+    collapsed: bool,
+) -> Result<Settings, String> {
+    let settings = update(&app, |s| s.sidebar_collapsed = collapsed)?;
+    webviews::relayout_app(&app);
+    Ok(settings)
+}
+
 #[tauri::command]
 pub async fn set_autostart<R: Runtime>(
     app: AppHandle<R>,

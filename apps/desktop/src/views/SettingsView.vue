@@ -52,7 +52,7 @@ function platformName(pluginId: string) {
 
 <template>
   <div class="flex h-full flex-col">
-    <TitleBar :crumbs="['Cài đặt']" />
+    <TitleBar :crumbs="['Cài đặt']" home />
 
     <div class="flex min-h-0 flex-1">
       <nav

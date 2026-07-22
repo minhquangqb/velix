@@ -2,18 +2,29 @@
 import { computed } from 'vue'
 import type { Profile, VelixPlugin } from '@velix/core'
 
-import { ArrowLeft, ArrowRight, Plus, RotateCw, ZoomIn, ZoomOut } from '@lucide/vue'
+import {
+  ArrowLeft,
+  ArrowRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  RotateCw,
+  ZoomIn,
+  ZoomOut,
+} from '@lucide/vue'
 
 import AccountList from '../components/AccountList.vue'
 import PlatformRail from '../components/PlatformRail.vue'
 import TitleBar from '../components/TitleBar.vue'
 import { usePlatformsStore } from '../stores/platforms'
 import { useProfilesStore } from '../stores/profiles'
+import { useSettingsStore } from '../stores/settings'
 import { useTabsStore } from '../stores/tabs'
 import { useUiStore } from '../stores/ui'
 
 const platforms = usePlatformsStore()
 const profiles = useProfilesStore()
+const settings = useSettingsStore()
 const tabs = useTabsStore()
 const ui = useUiStore()
 
@@ -54,15 +65,39 @@ function selectAccount(profile: Profile) {
 <template>
   <div class="flex h-full">
     <PlatformRail @select="selectPlatform" />
-    <AccountList @select="selectAccount" />
+    <AccountList v-if="!settings.settings.sidebarCollapsed" @select="selectAccount" />
 
     <!-- Workspace column. Its content area is the rectangle platform webviews
          are positioned into by webviews::relayout, so everything drawn here is
          a placeholder that a live webview covers. -->
     <div class="flex min-w-0 flex-1 flex-col" style="background: var(--vx-workspace)">
       <TitleBar :crumbs="crumbs">
-        <template v-if="activeProfile" #leading>
-          <div class="flex items-center gap-0.5" :style="{ color: 'var(--vx-text-3)' }">
+        <template #leading>
+          <button
+            type="button"
+            :title="
+              settings.settings.sidebarCollapsed
+                ? 'Hiện danh sách tài khoản'
+                : 'Ẩn danh sách tài khoản'
+            "
+            class="ml-0.5 grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-lg hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
+            :style="{ color: 'var(--vx-text-3)' }"
+            @click="run(() => settings.toggleSidebar())"
+          >
+            <PanelLeftOpen
+              v-if="settings.settings.sidebarCollapsed"
+              :size="16"
+              :stroke-width="1.7"
+              aria-hidden="true"
+            />
+            <PanelLeftClose v-else :size="16" :stroke-width="1.7" aria-hidden="true" />
+          </button>
+
+          <div
+            v-if="activeProfile"
+            class="ml-0.5 flex items-center gap-0.5"
+            :style="{ color: 'var(--vx-text-3)' }"
+          >
             <button
               type="button"
               title="Quay lại"

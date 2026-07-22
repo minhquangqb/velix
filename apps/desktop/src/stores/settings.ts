@@ -5,6 +5,7 @@ import {
   setAutostart,
   setCloseToTray,
   setQuiet,
+  setSidebarCollapsed,
   setTheme,
   type Settings,
   type Theme,
@@ -17,6 +18,7 @@ const DEFAULTS: Settings = {
   quiet: false,
   closeToTray: true,
   autostart: false,
+  sidebarCollapsed: false,
 }
 
 export const useSettingsStore = defineStore('settings', {
@@ -43,6 +45,13 @@ export const useSettingsStore = defineStore('settings', {
     },
     async setAutostart(autostart: boolean) {
       this.apply(await setAutostart(autostart))
+    },
+    /** Persists the collapse; Rust repositions the platform webviews to match. */
+    async setSidebarCollapsed(collapsed: boolean) {
+      this.apply(await setSidebarCollapsed(collapsed))
+    },
+    toggleSidebar() {
+      return this.setSidebarCollapsed(!this.settings.sidebarCollapsed)
     },
   },
 })

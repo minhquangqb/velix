@@ -11,6 +11,7 @@ export {
   focusWebview,
   hideWebviews,
   closeWebview,
+  setSidebarCollapsed,
   webviewBack,
   webviewForward,
   webviewReload,

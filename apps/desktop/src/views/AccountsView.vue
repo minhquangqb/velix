@@ -85,7 +85,7 @@ function confirmDelete() {
 
 <template>
   <div class="relative flex h-full flex-col">
-    <TitleBar :crumbs="['Quản lý tài khoản']" />
+    <TitleBar :crumbs="['Quản lý tài khoản']" home />
 
     <div class="min-h-0 flex-1 overflow-y-auto px-6 py-7.5">
       <div class="vx-fade mx-auto w-155 max-w-full">

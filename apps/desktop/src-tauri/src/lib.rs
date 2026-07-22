@@ -161,6 +161,7 @@ pub fn run() {
             settings::set_quiet,
             settings::set_close_to_tray,
             settings::set_autostart,
+            settings::set_sidebar_collapsed,
             tray::show_main_window,
             tray::open_settings,
             tray::open_account,

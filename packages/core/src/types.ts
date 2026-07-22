@@ -28,6 +28,8 @@ export interface Settings {
   /** Closing the main window hides it to tray instead of quitting. */
   closeToTray: boolean
   autostart: boolean
+  /** Account list hidden to give the workspace more room; restored on launch. */
+  sidebarCollapsed: boolean
 }
 
 /** Frameless-window state the custom title bar mirrors. */

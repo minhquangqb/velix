@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronRight, Copy, Minus, Square, X } from '@lucide/vue'
+import { ArrowLeft, ChevronRight, Copy, Minus, Square, X } from '@lucide/vue'
 import { windowClose, windowMinimize, windowStartDrag, windowToggleMaximize } from '@velix/core'
 
 import { useUiStore } from '../stores/ui'
@@ -7,6 +7,9 @@ import { useUiStore } from '../stores/ui'
 defineProps<{
   /** Breadcrumb trail after the "Velix" root, e.g. ["Messenger", "Cá nhân"]. */
   crumbs: string[]
+  /** Full-window surfaces set this to show a "back to workspace" button, since
+   *  they hide the rail and would otherwise have no way home. */
+  home?: boolean
 }>()
 
 const ui = useUiStore()
@@ -33,6 +36,17 @@ function onDragMouseDown(event: MouseEvent) {
   >
     <!-- Sits outside the drag region so its buttons don't start a window drag. -->
     <div class="flex h-full shrink-0 items-center">
+      <button
+        v-if="home"
+        type="button"
+        title="Về trang chính"
+        class="ml-0.5 flex h-7.5 cursor-pointer items-center gap-1.25 rounded-lg pr-2.5 pl-2 text-[12px] font-semibold hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
+        :style="{ color: 'var(--vx-text-3)' }"
+        @click="ui.goto('main')"
+      >
+        <ArrowLeft :size="16" :stroke-width="1.7" aria-hidden="true" />
+        Trang chính
+      </button>
       <slot name="leading" />
     </div>
 

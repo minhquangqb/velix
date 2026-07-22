@@ -84,6 +84,15 @@ export function setAutostart(autostart: boolean): Promise<Settings> {
   return invoke('set_autostart', { autostart })
 }
 
+/**
+ * Collapses/expands the account-list sidebar. Persisted like any setting; Rust
+ * also repositions the platform webviews, which are placed by native geometry
+ * rather than shell CSS. Resolves to the updated settings.
+ */
+export function setSidebarCollapsed(collapsed: boolean): Promise<Settings> {
+  return invoke('set_sidebar_collapsed', { collapsed })
+}
+
 /** Reveals and focuses the main window, hiding the tray popup. */
 export function showMainWindow(): Promise<void> {
   return invoke('show_main_window')

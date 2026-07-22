@@ -60,6 +60,9 @@ pub struct Settings {
     pub close_to_tray: bool,
     #[serde(default)]
     pub autostart: bool,
+    /// Account list hidden to give the workspace more room; restored on launch.
+    #[serde(default)]
+    pub sidebar_collapsed: bool,
 }
 
 impl Default for Settings {
@@ -69,6 +72,7 @@ impl Default for Settings {
             quiet: false,
             close_to_tray: true,
             autostart: false,
+            sidebar_collapsed: false,
         }
     }
 }
