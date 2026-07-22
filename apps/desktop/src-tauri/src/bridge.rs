@@ -196,7 +196,15 @@ pub const INJECT_SCRIPT: &str = r#"
 
   var baseTitle = null;      // idle title, e.g. "Messenger"
   var lastCount = 0;         // last definite unread count
-  var lastNotified = null;   // last sender line already toasted
+  var lastSentBadge = -1;    // last count actually sent to Rust
+  var lastNotified = null;   // sender line already toasted this away-period
+
+  // The title oscillates while unread, so the same count arrives repeatedly.
+  function setBadge(n) {
+    if (n === lastSentBadge) return;
+    lastSentBadge = n;
+    invoke('set_badge', { count: n });
+  }
 
   function onTitle() {
     stats.title++;
@@ -209,10 +217,11 @@ pub const INJECT_SCRIPT: &str = r#"
     // set before any notification). At inject time the title can still be empty.
     if (baseTitle === null) { if (stripped) baseTitle = stripped; return; }
 
-    // Badge: only a definite count moves it; the bare idle title clears it. A
-    // sender line carries no number, so it must not reset the badge to zero.
-    if (count !== null) { invoke('set_badge', { count: count }); lastCount = count; }
-    else if (stripped === baseTitle) { invoke('set_badge', { count: 0 }); lastCount = 0; }
+    // Badge: only a definite count moves it; the bare idle title clears it and
+    // ends the away-period. A sender line carries no number, so it must not
+    // reset the badge to zero.
+    if (count !== null) { setBadge(count); lastCount = count; }
+    else if (stripped === baseTitle) { setBadge(0); lastCount = 0; lastNotified = null; }
 
     // While the user is looking, nothing is "new"; reset so the next time they
     // are away the same sender notifies again.
@@ -230,14 +239,15 @@ pub const INJECT_SCRIPT: &str = r#"
       return;
     }
 
-    // Only a count rose and no sender line came with it: generic fallback,
-    // deferred so a sender line in the same flash wins and suppresses this.
-    if (count !== null && count > prev) {
+    // A count rose with no sender line: generic fallback, but only if no sender
+    // line toasted this away-period — the oscillating title shows the count and
+    // the sender line in either order, and the sender line already covered it.
+    if (count !== null && count > prev && !lastNotified) {
       var c = count;
       if (pendingToast) clearTimeout(pendingToast);
       pendingToast = setTimeout(function () {
         pendingToast = null;
-        if (Date.now() - lastRealNotifyMs < 2500) return;
+        if (lastNotified || Date.now() - lastRealNotifyMs < 2500) return;
         invoke('notify', {
           title: '',
           body: c > 1 ? ('Bạn có ' + c + ' tin nhắn mới') : 'Bạn có tin nhắn mới',
