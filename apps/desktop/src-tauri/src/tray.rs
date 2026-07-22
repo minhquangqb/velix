@@ -246,6 +246,8 @@ pub fn show_main<R: Runtime>(app: &AppHandle<R>) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        // Back on screen: the active page is foreground again.
+        webviews::set_active_hidden(app, false);
     }
 }
 

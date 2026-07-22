@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { Profile, VelixPlugin } from '@velix/core'
 
-import { Plus } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, Plus, RotateCw, ZoomIn, ZoomOut } from '@lucide/vue'
 
 import AccountList from '../components/AccountList.vue'
 import PlatformRail from '../components/PlatformRail.vue'
@@ -61,6 +61,62 @@ function selectAccount(profile: Profile) {
          a placeholder that a live webview covers. -->
     <div class="flex min-w-0 flex-1 flex-col" style="background: var(--vx-workspace)">
       <TitleBar :crumbs="crumbs">
+        <template v-if="activeProfile" #leading>
+          <div class="flex items-center gap-0.5" :style="{ color: 'var(--vx-text-3)' }">
+            <button
+              type="button"
+              title="Quay lại"
+              class="grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-lg hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
+              @click="run(() => tabs.back())"
+            >
+              <ArrowLeft :size="16" :stroke-width="1.7" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              title="Tiến tới"
+              class="grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-lg hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
+              @click="run(() => tabs.forward())"
+            >
+              <ArrowRight :size="16" :stroke-width="1.7" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              title="Tải lại"
+              class="grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-lg hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
+              @click="run(() => tabs.reload())"
+            >
+              <RotateCw :size="15" :stroke-width="1.7" aria-hidden="true" />
+            </button>
+
+            <div class="mx-1 h-4 w-px" :style="{ background: 'var(--vx-hairline)' }" />
+
+            <button
+              type="button"
+              title="Thu nhỏ"
+              class="grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-lg hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
+              @click="run(() => tabs.setZoom(-0.1))"
+            >
+              <ZoomOut :size="15" :stroke-width="1.7" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              title="Đặt lại 100%"
+              class="min-w-10 cursor-pointer rounded-lg px-1.5 py-1 text-center font-mono text-[11px] tabular-nums hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
+              @click="run(() => tabs.setZoom(0))"
+            >
+              {{ Math.round(tabs.activeZoom * 100) }}%
+            </button>
+            <button
+              type="button"
+              title="Phóng to"
+              class="grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-lg hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
+              @click="run(() => tabs.setZoom(0.1))"
+            >
+              <ZoomIn :size="15" :stroke-width="1.7" aria-hidden="true" />
+            </button>
+          </div>
+        </template>
+
         <template #status>
           <span
             v-if="activeProfile"

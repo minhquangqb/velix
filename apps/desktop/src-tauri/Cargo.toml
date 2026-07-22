@@ -20,3 +20,6 @@ tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Opens external links (message links) in the system browser rather than
+# letting them navigate the platform webview away and drop its IPC grant.
+open = "5"

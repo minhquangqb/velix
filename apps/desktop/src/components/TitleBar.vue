@@ -28,10 +28,18 @@ function onDragMouseDown(event: MouseEvent) {
 
 <template>
   <header
-    class="flex h-11 shrink-0 items-center pl-4.5"
+    class="flex h-11 shrink-0 items-center pl-2"
     style="border-bottom: 1px solid var(--vx-hairline); background: var(--vx-card)"
   >
-    <div class="flex h-full flex-1 items-center gap-2 text-[12.5px]" @mousedown="onDragMouseDown">
+    <!-- Sits outside the drag region so its buttons don't start a window drag. -->
+    <div class="flex h-full shrink-0 items-center">
+      <slot name="leading" />
+    </div>
+
+    <div
+      class="flex h-full flex-1 items-center gap-2 pl-2.5 text-[12.5px]"
+      @mousedown="onDragMouseDown"
+    >
       <span :style="{ color: 'var(--vx-text-3)' }">Velix</span>
       <template v-for="(crumb, index) in crumbs" :key="index">
         <ChevronRight :size="13" :stroke-width="1.6" class="opacity-30" aria-hidden="true" />

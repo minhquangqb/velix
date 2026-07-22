@@ -126,6 +126,9 @@ pub fn run() {
                     if close_to_tray && !tray::is_quitting() {
                         api.prevent_close();
                         window_state::capture(&handle);
+                        // Tell the active page it is now backgrounded, so it
+                        // notifies for messages that arrive while in the tray.
+                        webviews::set_active_hidden(handle.app_handle(), true);
                         let _ = handle.hide();
                     }
                 }
@@ -144,6 +147,10 @@ pub fn run() {
             webviews::focus_webview,
             webviews::hide_webviews,
             webviews::close_webview,
+            webviews::webview_back,
+            webviews::webview_forward,
+            webviews::webview_reload,
+            webviews::webview_set_zoom,
             window_ctl::window_is_maximized,
             window_ctl::window_minimize,
             window_ctl::window_toggle_maximize,

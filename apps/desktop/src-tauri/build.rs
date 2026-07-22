@@ -9,7 +9,7 @@ fn main() {
         Attributes::new().plugin(
             "velix",
             InlinedPlugin::new()
-                .commands(&["notify", "set_badge"])
+                .commands(&["notify", "set_badge", "open_external"])
                 .default_permission(DefaultPermissionRule::AllowAllCommands),
         ),
     )

@@ -45,6 +45,25 @@ export function closeWebview(label: string): Promise<void> {
   return invoke('close_webview', { label })
 }
 
+// Navigation for the platform webview on screen. Called from the trusted shell,
+// so they act on whichever webview Rust has marked active.
+export function webviewBack(): Promise<void> {
+  return invoke('webview_back')
+}
+
+export function webviewForward(): Promise<void> {
+  return invoke('webview_forward')
+}
+
+export function webviewReload(): Promise<void> {
+  return invoke('webview_reload')
+}
+
+/** Sets native zoom (clamped in Rust); resolves to the factor actually applied. */
+export function webviewSetZoom(factor: number): Promise<number> {
+  return invoke('webview_set_zoom', { factor })
+}
+
 export function getSettings(): Promise<Settings> {
   return invoke('get_settings')
 }

@@ -1,5 +1,15 @@
 import { defineStore } from 'pinia'
-import { closeWebview, focusWebview, hideWebviews, openWebview, type Profile } from '@velix/core'
+import {
+  closeWebview,
+  focusWebview,
+  hideWebviews,
+  openWebview,
+  webviewBack,
+  webviewForward,
+  webviewReload,
+  webviewSetZoom,
+  type Profile,
+} from '@velix/core'
 
 import { findPlugin } from '../registry'
 
@@ -21,10 +31,15 @@ export const useTabsStore = defineStore('tabs', {
     resumeProfileId: null as string | null,
     /** True while a webview is being created — the workspace shows a spinner. */
     opening: false,
+    /** profileId -> native zoom factor, remembered per account. */
+    zoom: {} as Record<string, number>,
   }),
   getters: {
     isOpen(state) {
       return (profileId: string) => profileId in state.openLabels
+    },
+    activeZoom(state): number {
+      return state.activeProfileId ? (state.zoom[state.activeProfileId] ?? 1) : 1
     },
   },
   actions: {
@@ -68,11 +83,28 @@ export const useTabsStore = defineStore('tabs', {
     /** Drops local bookkeeping for a webview Rust has already disposed of. */
     forget(profileId: string) {
       delete this.openLabels[profileId]
+      delete this.zoom[profileId]
       if (this.activeProfileId === profileId) this.activeProfileId = null
       if (this.resumeProfileId === profileId) this.resumeProfileId = null
       for (const [pluginId, id] of Object.entries(this.lastByPlugin)) {
         if (id === profileId) delete this.lastByPlugin[pluginId]
       }
+    },
+    back() {
+      return webviewBack()
+    },
+    forward() {
+      return webviewForward()
+    },
+    reload() {
+      return webviewReload()
+    },
+    /** Steps zoom by `delta` (0 resets to 100%), remembering it per account. */
+    async setZoom(delta: number) {
+      const id = this.activeProfileId
+      if (!id) return
+      const next = delta === 0 ? 1 : (this.zoom[id] ?? 1) + delta
+      this.zoom[id] = await webviewSetZoom(next)
     },
   },
 })

@@ -20,67 +20,75 @@ use crate::{tray, webviews, AppState};
 /// Emitted to the shell UI and the tray popup whenever unread counts change.
 pub const UNREAD_EVENT: &str = "velix://unread";
 
-/// Polyfill injected into every platform webview.
+/// Polyfill injected into every platform webview. Re-runs on every top-level
+/// navigation (WebView2 re-injects per document), so it guards against
+/// double-installing. It does four jobs:
 ///
-/// Runs on every top-level navigation (WebView2 re-injects per document), so it
-/// guards against double-installing. `Notification` and `navigator.setAppBadge`
-/// are forwarded to Rust; `requestPermission` resolves to "granted" so pages
-/// never show the in-page permission prompt they cannot satisfy here.
+/// 1. Forward the page's own notifications (`Notification`,
+///    `ServiceWorkerRegistration.showNotification`) to native toasts — these
+///    carry the real sender and message.
+/// 2. Spoof `document.visibilityState`/`hidden` so a hidden webview looks
+///    hidden to the page (WebView2 always reports it visible). Chat sites
+///    suppress their own notifications while "visible", so without this a
+///    backgrounded account stays silent. Rust drives it via `__velixSetHidden`.
+/// 3. Track the unread count in the tab title (`(3) Messenger`) for the badge,
+///    and fire a generic toast as a fallback when the page produced none.
+/// 4. Open cross-site links in the system browser instead of letting them
+///    navigate the webview away — which would drop its origin-scoped IPC grant.
 pub const INJECT_SCRIPT: &str = r#"
 (function () {
   if (window.__VELIX_BRIDGE__) return;
   Object.defineProperty(window, '__VELIX_BRIDGE__', { value: true });
 
-  // Diagnostics. The page is a black box: if it never calls these APIs, the
-  // bridge is silent for reasons no log on the Rust side can distinguish from
-  // an IPC failure. `__velixProbe()` in devtools tells the two apart.
   var stats = { ctor: 0, sw: 0, badge: 0, title: 0, sent: 0, failed: 0 };
   var lastError = null;
+  // Timestamp of the last real (content-bearing) notification, used to suppress
+  // the generic title-based fallback toast when the page already toasted.
+  var lastRealNotifyMs = 0;
+  var pendingToast = null;
 
   function invoke(cmd, args) {
     try {
       var internals = window.__TAURI_INTERNALS__;
       if (internals && internals.invoke) {
         return Promise.resolve(internals.invoke('plugin:velix|' + cmd, args)).then(
-          function (value) {
-            stats.sent++;
-            return value;
-          },
+          function (value) { stats.sent++; return value; },
           function (error) {
             // Swallowed so a blocked call cannot break the page, but recorded:
             // an ACL rejection and an API the page never calls look identical
             // from the outside otherwise.
-            stats.failed++;
-            lastError = String(error);
-            return undefined;
+            stats.failed++; lastError = String(error); return undefined;
           }
         );
       }
       lastError = '__TAURI_INTERNALS__.invoke missing';
-    } catch (e) {
-      lastError = String(e);
-    }
+    } catch (e) { lastError = String(e); }
     stats.failed++;
     return Promise.resolve();
   }
 
+  // A real notification from the page: it has content, so it wins over the
+  // generic title fallback. No count — the title watcher owns the badge.
   function send(title, options) {
     options = options || {};
+    lastRealNotifyMs = Date.now();
+    if (pendingToast) { clearTimeout(pendingToast); pendingToast = null; }
     invoke('notify', {
       title: title == null ? '' : String(title),
       body: options.body == null ? '' : String(options.body)
     });
   }
 
+  // --- Diagnostics (dev bring-up; strip before release, Phase 5) -----------
   window.__velixProbe = function () {
     var report = {
       bridgeInstalled: true,
       tauriInternals: !!(window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke),
       notificationPermission: window.Notification ? window.Notification.permission : 'no api',
       badgeApi: typeof navigator.setAppBadge,
-      serviceWorkerControlled: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
       documentTitle: document.title,
       titleCount: titleCount(),
+      spoofedHidden: velixHidden,
       visibilityState: document.visibilityState,
       hasFocus: document.hasFocus(),
       calls: stats,
@@ -89,15 +97,11 @@ pub const INJECT_SCRIPT: &str = r#"
     console.log('[velix probe]\n' + JSON.stringify(report, null, 2));
     return report;
   };
-
-  /** Fires a notification straight through the bridge, skipping the page. */
   window.__velixTest = function () {
-    return invoke('notify', { title: 'Velix', body: 'Test tu devtools' }).then(function () {
-      console.log('[velix test] sent=' + stats.sent + ' failed=' + stats.failed +
-        ' lastError=' + lastError);
-    });
+    return invoke('notify', { title: 'Velix', body: 'Test tu devtools' });
   };
 
+  // --- Native notifications from the page's own APIs -----------------------
   function VelixNotification(title, options) {
     options = options || {};
     this.title = title;
@@ -105,10 +109,7 @@ pub const INJECT_SCRIPT: &str = r#"
     this.tag = options.tag || '';
     this.icon = options.icon || '';
     this.data = options.data;
-    this.onclick = null;
-    this.onclose = null;
-    this.onerror = null;
-    this.onshow = null;
+    this.onclick = null; this.onclose = null; this.onerror = null; this.onshow = null;
     stats.ctor++;
     send(title, options);
   }
@@ -122,16 +123,12 @@ pub const INJECT_SCRIPT: &str = r#"
     if (typeof cb === 'function') { try { cb('granted'); } catch (e) {} }
     return Promise.resolve('granted');
   };
-
   try {
     Object.defineProperty(window, 'Notification', {
-      configurable: true,
-      writable: true,
-      value: VelixNotification
+      configurable: true, writable: true, value: VelixNotification
     });
   } catch (e) {}
 
-  // Service-worker notifications are the other common path (Messenger uses it).
   try {
     if (window.ServiceWorkerRegistration && window.ServiceWorkerRegistration.prototype) {
       window.ServiceWorkerRegistration.prototype.showNotification = function (title, options) {
@@ -159,11 +156,33 @@ pub const INJECT_SCRIPT: &str = r#"
     };
   } catch (e) {}
 
-  // Unread from the tab title, e.g. "(3) Messenger". This is the reliable path
-  // for chat sites embedded in a webview: WebView2 reports the tab as visible
-  // even when hidden, so Messenger believes the user is looking and never fires
-  // its own notifications or badge — but it still keeps the count in the title.
-  // Generic baseline: any "(n) Name" web chat benefits, no per-site knowledge.
+  // --- Visibility spoof ----------------------------------------------------
+  // WebView2 reports a hidden child webview as visible, so chat sites think the
+  // user is watching and never notify. Rust calls __velixSetHidden(true) when
+  // the webview is off screen; the page then behaves as a background tab and
+  // fires its own (content-bearing) notifications, caught above.
+  var velixHidden = false;
+  window.__velixSetHidden = function (hidden) {
+    hidden = !!hidden;
+    if (hidden === velixHidden) return;
+    velixHidden = hidden;
+    try { document.dispatchEvent(new Event('visibilitychange')); } catch (e) {}
+    try { window.dispatchEvent(new Event(hidden ? 'blur' : 'focus')); } catch (e) {}
+  };
+  try {
+    var visGetter = function () { return velixHidden ? 'hidden' : 'visible'; };
+    var hidGetter = function () { return velixHidden; };
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: visGetter });
+    Object.defineProperty(document, 'hidden', { configurable: true, get: hidGetter });
+    Object.defineProperty(document, 'webkitVisibilityState', { configurable: true, get: visGetter });
+    Object.defineProperty(document, 'webkitHidden', { configurable: true, get: hidGetter });
+  } catch (e) {}
+  try {
+    var realHasFocus = document.hasFocus.bind(document);
+    document.hasFocus = function () { return velixHidden ? false : realHasFocus(); };
+  } catch (e) {}
+
+  // --- Unread count from the tab title ------------------------------------
   function titleCount() {
     var m = /\((\d+)\+?\)/.exec(document.title || '');
     return m ? parseInt(m[1], 10) : 0;
@@ -178,15 +197,19 @@ pub const INJECT_SCRIPT: &str = r#"
     lastTitleCount = count;
     stats.title++;
 
-    // First read after load only syncs the badge — a backlog is not "new".
-    // A rise while the user is not actually looking (hidden tab, or the window
-    // is in the background) is a genuine new message and earns a toast. Note
-    // hasFocus, not visibilityState: the latter lies for hidden child webviews.
+    invoke('set_badge', { count: count }); // badge is instant and authoritative
+
+    // A rise while the user is not looking is a new message. Defer the generic
+    // toast: if the page fires its own (content-bearing) one first, send()
+    // cancels this, and the user gets the richer notification instead.
     if (prev >= 0 && count > prev && !document.hasFocus()) {
-      var body = count > 1 ? ('Bạn có ' + count + ' tin nhắn mới') : 'Bạn có tin nhắn mới';
-      invoke('notify', { title: '', body: body, count: count });
-    } else {
-      invoke('set_badge', { count: count });
+      if (pendingToast) clearTimeout(pendingToast);
+      pendingToast = setTimeout(function () {
+        pendingToast = null;
+        if (Date.now() - lastRealNotifyMs < 1500) return;
+        var body = count > 1 ? ('Bạn có ' + count + ' tin nhắn mới') : 'Bạn có tin nhắn mới';
+        invoke('notify', { title: '', body: body, count: count });
+      }, 1200);
     }
   }
 
@@ -194,17 +217,48 @@ pub const INJECT_SCRIPT: &str = r#"
     var titleEl = document.querySelector('title');
     if (titleEl) {
       new MutationObserver(onTitle).observe(titleEl, {
-        childList: true,
-        characterData: true,
-        subtree: true
+        childList: true, characterData: true, subtree: true
       });
     }
   } catch (e) {}
-  // Backstop: the <title> node can be swapped out wholesale, orphaning the
-  // observer, and a background tab may batch its mutations. A slow poll never
-  // misses; 4s is well within tolerance for a notification.
+  // Backstop: the <title> node can be replaced wholesale, orphaning the
+  // observer, and a background tab may batch mutations. A slow poll never misses.
   setInterval(onTitle, 4000);
   onTitle();
+
+  // --- External links ------------------------------------------------------
+  // A message link to a third-party site must open in the system browser, not
+  // hijack the platform webview (which would drop its origin-scoped IPC grant
+  // and strand the user with no way back). "External" = a different registrable
+  // domain than the current page; same-site links navigate normally.
+  function registrable(host) {
+    var parts = (host || '').split('.');
+    return parts.slice(-2).join('.');
+  }
+  function externalUrl(href) {
+    try {
+      var u = new URL(href, location.href);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+      return registrable(u.hostname) === registrable(location.hostname) ? null : u.href;
+    } catch (e) { return null; }
+  }
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0) return;
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    var ext = externalUrl(a.getAttribute('href'));
+    if (ext) {
+      e.preventDefault();
+      e.stopPropagation();
+      invoke('open_external', { url: ext });
+    }
+  }, true);
+  var realOpen = window.open;
+  window.open = function (url) {
+    var ext = url ? externalUrl(String(url)) : null;
+    if (ext) { invoke('open_external', { url: ext }); return null; }
+    return realOpen ? realOpen.apply(window, arguments) : null;
+  };
 })();
 "#;
 
@@ -281,12 +335,6 @@ fn set_unread<R: Runtime>(app: &AppHandle<R>, label: &str, count: u32) {
     }
 }
 
-fn bump_unread<R: Runtime>(app: &AppHandle<R>, label: &str) {
-    let state = app.state::<BridgeState>();
-    let mut unread = state.unread.lock().unwrap();
-    *unread.entry(label.to_string()).or_insert(0) += 1;
-}
-
 /// Clears a webview's unread count — called when the user actually looks at it.
 pub fn clear_unread<R: Runtime>(app: &AppHandle<R>, label: &str) {
     let had = {
@@ -347,11 +395,13 @@ pub fn grant_remote_access<R: Runtime>(
     })
 }
 
-/// Fires a native toast for a platform page and updates its unread count.
+/// Fires a native toast for a platform page and, when the page reports one,
+/// updates its unread count.
 ///
-/// `count` is the authoritative unread total when the page knows it (e.g. from
-/// the tab title); `None` bumps by one, for the `Notification` API path where
-/// each call is a single message with no running total.
+/// `count` is the authoritative unread total when the page knows it (the title
+/// watcher's fallback toast passes it). `None` means toast only: the page's own
+/// `Notification` carries content but no total, and the title watcher already
+/// owns the badge, so there is nothing to set here.
 #[tauri::command]
 pub async fn notify<R: Runtime>(
     app: AppHandle<R>,
@@ -378,12 +428,13 @@ pub async fn notify<R: Runtime>(
         return Ok(());
     };
 
-    // Count regardless of quiet mode — quiet silences the toast, not the badge.
-    match count {
-        Some(count) => set_unread(&app, &label, count),
-        None => bump_unread(&app, &label),
+    // Only the title-watcher path carries a count; the page-notification path
+    // leaves the badge to the title watcher. Count regardless of quiet mode —
+    // quiet silences the toast, not the badge.
+    if let Some(count) = count {
+        set_unread(&app, &label, count);
+        publish(&app);
     }
-    publish(&app);
 
     // Global quiet mode and the per-account mute both silence only the toast.
     if !quiet && !profile.muted {
@@ -411,14 +462,37 @@ pub async fn set_badge<R: Runtime>(
     count: u32,
 ) -> Result<(), String> {
     #[cfg(debug_assertions)]
-    eprintln!("[velix] set_badge from {:?}: count={count}", webview.label());
+    eprintln!(
+        "[velix] set_badge from {:?}: count={count}",
+        webview.label()
+    );
     set_unread(&app, webview.label(), count);
     publish(&app);
     Ok(())
 }
 
+/// Opens a link in the system browser. The inject script routes cross-site
+/// message links here so they do not navigate the platform webview away and
+/// drop its origin-scoped IPC grant.
+#[tauri::command]
+pub async fn open_external(url: String) -> Result<(), String> {
+    // Only web links. The command is reachable from remote pages, so a
+    // `file:` or custom scheme must never reach the OS opener from here.
+    let parsed = url.parse::<tauri::Url>().map_err(|e| e.to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(format!("refusing non-web url: {url}"));
+    }
+    #[cfg(debug_assertions)]
+    eprintln!("[velix] open_external: {url}");
+    // Detached: the opener spawns a browser process we do not want to await.
+    std::thread::spawn(move || {
+        let _ = open::that(url);
+    });
+    Ok(())
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     tauri::plugin::Builder::new("velix")
-        .invoke_handler(tauri::generate_handler![notify, set_badge])
+        .invoke_handler(tauri::generate_handler![notify, set_badge, open_external])
         .build()
 }

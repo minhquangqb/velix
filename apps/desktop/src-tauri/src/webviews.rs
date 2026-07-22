@@ -87,9 +87,43 @@ pub fn relayout<R: Runtime>(window: &Window<R>) {
     }
 }
 
-/// Label of the platform webview currently on screen, for devtools targeting.
+/// Label of the platform webview currently on screen, for devtools targeting
+/// and for telling the shell which webview the navigation buttons act on.
 #[derive(Default)]
 pub struct ActiveWebview(pub std::sync::Mutex<Option<String>>);
+
+/// Tells a platform page whether its webview is on screen, so it can behave as a
+/// background tab when hidden (see the visibility spoof in `bridge.rs`). WebView2
+/// never reports a hidden child webview as hidden, so the page cannot tell on its
+/// own — Rust, which drives show/hide, is the only source of truth.
+fn set_page_hidden<R: Runtime>(webview: &tauri::Webview<R>, hidden: bool) {
+    let _ = webview.eval(format!(
+        "window.__velixSetHidden && window.__velixSetHidden({hidden})"
+    ));
+}
+
+/// Marks the active platform webview hidden/visible for the whole window, e.g.
+/// when it drops to the tray or comes back.
+pub fn set_active_hidden<R: Runtime>(app: &AppHandle<R>, hidden: bool) {
+    let Ok(window) = main_window(app) else { return };
+    let active = app.state::<ActiveWebview>().0.lock().unwrap().clone();
+    let Some(active) = active else { return };
+    if let Some(webview) = window.webviews().into_iter().find(|w| w.label() == active) {
+        set_page_hidden(&webview, hidden);
+    }
+}
+
+/// Runs `back`/`forward`/`reload`/`zoom` against the platform webview on screen.
+fn active_webview<R: Runtime>(app: &AppHandle<R>) -> Result<tauri::Webview<R>, String> {
+    let window = main_window(app)?;
+    let active = app.state::<ActiveWebview>().0.lock().unwrap().clone();
+    let active = active.ok_or_else(|| "no active webview".to_string())?;
+    window
+        .webviews()
+        .into_iter()
+        .find(|w| w.label() == active)
+        .ok_or_else(|| format!("active webview gone: {active}"))
+}
 
 /// Opens devtools on the platform webview currently on screen.
 ///
@@ -113,8 +147,12 @@ fn show_only<R: Runtime>(window: &Window<R>, label: &str) -> Result<(), String> 
         }
         if webview.label() == label {
             webview.show().map_err(|e| e.to_string())?;
+            set_page_hidden(&webview, false);
         } else {
             let _ = webview.hide();
+            // A backgrounded account should keep notifying: let its page know it
+            // is off screen so it stops assuming the user is watching.
+            set_page_hidden(&webview, true);
         }
     }
     *window
@@ -228,4 +266,42 @@ pub async fn close_webview<R: Runtime>(app: AppHandle<R>, label: String) -> Resu
         return Err("cannot close the ui webview".to_string());
     }
     close_by_label(&app, &label)
+}
+
+/// Zoom bounds. Below/above these the page layout stops being usable.
+const MIN_ZOOM: f64 = 0.5;
+const MAX_ZOOM: f64 = 2.0;
+
+// Navigation controls for the platform webview on screen. Called from the shell
+// UI (trusted), so they need no remote ACL. Async like every webview-touching
+// command (a sync one deadlocks on Windows, wry#583). `history.back/forward` go
+// through eval because wry exposes no go-back API; SPAs handle the History API.
+#[tauri::command]
+pub async fn webview_back<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    active_webview(&app)?
+        .eval("history.back()")
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn webview_forward<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    active_webview(&app)?
+        .eval("history.forward()")
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn webview_reload<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    active_webview(&app)?.reload().map_err(|e| e.to_string())
+}
+
+/// Sets the native zoom of the active webview. Native, not a CSS transform,
+/// which breaks SPA layouts (ChatGPT in particular).
+#[tauri::command]
+pub async fn webview_set_zoom<R: Runtime>(app: AppHandle<R>, factor: f64) -> Result<f64, String> {
+    let factor = factor.clamp(MIN_ZOOM, MAX_ZOOM);
+    active_webview(&app)?
+        .set_zoom(factor)
+        .map_err(|e| e.to_string())?;
+    Ok(factor)
 }
