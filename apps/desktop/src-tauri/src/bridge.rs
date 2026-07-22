@@ -34,7 +34,7 @@ pub const INJECT_SCRIPT: &str = r#"
   // Diagnostics. The page is a black box: if it never calls these APIs, the
   // bridge is silent for reasons no log on the Rust side can distinguish from
   // an IPC failure. `__velixProbe()` in devtools tells the two apart.
-  var stats = { ctor: 0, sw: 0, badge: 0, sent: 0, failed: 0 };
+  var stats = { ctor: 0, sw: 0, badge: 0, title: 0, sent: 0, failed: 0 };
   var lastError = null;
 
   function invoke(cmd, args) {
@@ -80,6 +80,7 @@ pub const INJECT_SCRIPT: &str = r#"
       badgeApi: typeof navigator.setAppBadge,
       serviceWorkerControlled: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
       documentTitle: document.title,
+      titleCount: titleCount(),
       visibilityState: document.visibilityState,
       hasFocus: document.hasFocus(),
       calls: stats,
@@ -157,6 +158,53 @@ pub const INJECT_SCRIPT: &str = r#"
       return Promise.resolve();
     };
   } catch (e) {}
+
+  // Unread from the tab title, e.g. "(3) Messenger". This is the reliable path
+  // for chat sites embedded in a webview: WebView2 reports the tab as visible
+  // even when hidden, so Messenger believes the user is looking and never fires
+  // its own notifications or badge — but it still keeps the count in the title.
+  // Generic baseline: any "(n) Name" web chat benefits, no per-site knowledge.
+  function titleCount() {
+    var m = /\((\d+)\+?\)/.exec(document.title || '');
+    return m ? parseInt(m[1], 10) : 0;
+  }
+
+  var lastTitleCount = -1;
+
+  function onTitle() {
+    var count = titleCount();
+    if (count === lastTitleCount) return;
+    var prev = lastTitleCount;
+    lastTitleCount = count;
+    stats.title++;
+
+    // First read after load only syncs the badge — a backlog is not "new".
+    // A rise while the user is not actually looking (hidden tab, or the window
+    // is in the background) is a genuine new message and earns a toast. Note
+    // hasFocus, not visibilityState: the latter lies for hidden child webviews.
+    if (prev >= 0 && count > prev && !document.hasFocus()) {
+      var body = count > 1 ? ('Bạn có ' + count + ' tin nhắn mới') : 'Bạn có tin nhắn mới';
+      invoke('notify', { title: '', body: body, count: count });
+    } else {
+      invoke('set_badge', { count: count });
+    }
+  }
+
+  try {
+    var titleEl = document.querySelector('title');
+    if (titleEl) {
+      new MutationObserver(onTitle).observe(titleEl, {
+        childList: true,
+        characterData: true,
+        subtree: true
+      });
+    }
+  } catch (e) {}
+  // Backstop: the <title> node can be swapped out wholesale, orphaning the
+  // observer, and a background tab may batch its mutations. A slow poll never
+  // misses; 4s is well within tolerance for a notification.
+  setInterval(onTitle, 4000);
+  onTitle();
 })();
 "#;
 
@@ -299,14 +347,22 @@ pub fn grant_remote_access<R: Runtime>(
     })
 }
 
+/// Fires a native toast for a platform page and updates its unread count.
+///
+/// `count` is the authoritative unread total when the page knows it (e.g. from
+/// the tab title); `None` bumps by one, for the `Notification` API path where
+/// each call is a single message with no running total.
 #[tauri::command]
 pub async fn notify<R: Runtime>(
     app: AppHandle<R>,
     webview: Webview<R>,
     title: String,
     body: String,
+    count: Option<u32>,
 ) -> Result<(), String> {
     let label = webview.label().to_string();
+    #[cfg(debug_assertions)]
+    eprintln!("[velix] notify from {label:?}: count={count:?} body={body:?}");
     let (quiet, profile) = {
         let state = app.state::<AppState>();
         let store = state.0.lock().unwrap();
@@ -317,11 +373,16 @@ pub async fn notify<R: Runtime>(
     };
     // Unknown webview: nothing to attribute the notification to, so drop it.
     let Some(profile) = profile else {
+        #[cfg(debug_assertions)]
+        eprintln!("[velix] notify dropped: no profile for {label:?}");
         return Ok(());
     };
 
     // Count regardless of quiet mode — quiet silences the toast, not the badge.
-    bump_unread(&app, &label);
+    match count {
+        Some(count) => set_unread(&app, &label, count),
+        None => bump_unread(&app, &label),
+    }
     publish(&app);
 
     // Global quiet mode and the per-account mute both silence only the toast.
@@ -349,6 +410,8 @@ pub async fn set_badge<R: Runtime>(
     webview: Webview<R>,
     count: u32,
 ) -> Result<(), String> {
+    #[cfg(debug_assertions)]
+    eprintln!("[velix] set_badge from {:?}: count={count}", webview.label());
     set_unread(&app, webview.label(), count);
     publish(&app);
     Ok(())
