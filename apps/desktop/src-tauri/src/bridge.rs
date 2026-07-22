@@ -182,34 +182,68 @@ pub const INJECT_SCRIPT: &str = r#"
     document.hasFocus = function () { return velixHidden ? false : realHasFocus(); };
   } catch (e) {}
 
-  // --- Unread count from the tab title ------------------------------------
+  // --- The tab title: unread count AND, on many chat sites, the sender -----
+  // Chat sites flash the title between "(N) Messenger" and a notification line
+  // like "An đã nhắn tin cho bạn" ("An sent you a message") whenever the tab is
+  // unfocused. So the title gives both the badge count and, for free, the
+  // sender to put in the toast — no per-site DOM scraping. The idle title (the
+  // bare site name) is captured once as a baseline; anything else, minus a
+  // leading "(N)", is a sender line.
   function titleCount() {
     var m = /\((\d+)\+?\)/.exec(document.title || '');
-    return m ? parseInt(m[1], 10) : 0;
+    return m ? parseInt(m[1], 10) : null;
   }
 
-  var lastTitleCount = -1;
+  var baseTitle = null;      // idle title, e.g. "Messenger"
+  var lastCount = 0;         // last definite unread count
+  var lastNotified = null;   // last sender line already toasted
 
   function onTitle() {
-    var count = titleCount();
-    if (count === lastTitleCount) return;
-    var prev = lastTitleCount;
-    lastTitleCount = count;
     stats.title++;
+    var raw = document.title || '';
+    var count = titleCount();
+    var stripped = raw.replace(/^\(\d+\+?\)\s*/, '').trim();
+    var prev = lastCount;
 
-    invoke('set_badge', { count: count }); // badge is instant and authoritative
+    // Establish the idle baseline from the first non-empty title (the site name,
+    // set before any notification). At inject time the title can still be empty.
+    if (baseTitle === null) { if (stripped) baseTitle = stripped; return; }
 
-    // A rise while the user is not looking is a new message. Defer the generic
-    // toast: if the page fires its own (content-bearing) one first, send()
-    // cancels this, and the user gets the richer notification instead.
-    if (prev >= 0 && count > prev && !document.hasFocus()) {
+    // Badge: only a definite count moves it; the bare idle title clears it. A
+    // sender line carries no number, so it must not reset the badge to zero.
+    if (count !== null) { invoke('set_badge', { count: count }); lastCount = count; }
+    else if (stripped === baseTitle) { invoke('set_badge', { count: 0 }); lastCount = 0; }
+
+    // While the user is looking, nothing is "new"; reset so the next time they
+    // are away the same sender notifies again.
+    if (document.hasFocus()) { lastNotified = null; return; }
+
+    var isSenderLine = stripped && stripped !== baseTitle;
+    if (isSenderLine) {
+      // Real content in the title → toast it, once per distinct line.
+      if (stripped !== lastNotified) {
+        lastNotified = stripped;
+        lastRealNotifyMs = Date.now();
+        if (pendingToast) { clearTimeout(pendingToast); pendingToast = null; }
+        invoke('notify', { title: '', body: stripped });
+      }
+      return;
+    }
+
+    // Only a count rose and no sender line came with it: generic fallback,
+    // deferred so a sender line in the same flash wins and suppresses this.
+    if (count !== null && count > prev) {
+      var c = count;
       if (pendingToast) clearTimeout(pendingToast);
       pendingToast = setTimeout(function () {
         pendingToast = null;
-        if (Date.now() - lastRealNotifyMs < 1500) return;
-        var body = count > 1 ? ('Bạn có ' + count + ' tin nhắn mới') : 'Bạn có tin nhắn mới';
-        invoke('notify', { title: '', body: body, count: count });
-      }, 1200);
+        if (Date.now() - lastRealNotifyMs < 2500) return;
+        invoke('notify', {
+          title: '',
+          body: c > 1 ? ('Bạn có ' + c + ' tin nhắn mới') : 'Bạn có tin nhắn mới',
+          count: c
+        });
+      }, 1500);
     }
   }
 
