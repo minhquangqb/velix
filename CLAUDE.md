@@ -57,7 +57,15 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
   - ⚠️ **Notification chỉ đúng tên/icon Velix khi BUILD + INSTALL** — dev mode toast mang tên PowerShell (caveat Phase 2, WinRT cần AppUserModelID từ shortcut Start Menu). Không phải bug
   - **Chẩn đoán còn cắm trong code** (gỡ ở Phase 5 trước release): JS `window.__velixProbe()` / `__velixTest()`; Rust `eprintln!("[velix] ...")` (chỉ debug build); `Ctrl+Shift+I` mở devtools webview nền tảng (global shortcut vì webview con giữ bàn phím). Tái dùng khi bring-up 3 nền tảng còn lại
 - Chưa làm: Phase 4 (plugin system), Downloads (tách riêng), Phase 5 (release)
-- Chưa làm: Phase 4 (plugin system), Downloads (tách riêng), Phase 5 (release)
+
+## Release / CI (GitHub)
+
+- **Repo**: `minhquangqb/velix` (private). Remote `origin` dùng **SSH** (`git@github.com:...`) — push file trong `.github/workflows/` không vướng scope `workflow` như khi push HTTPS bằng OAuth token
+- **CI**: `.github/workflows/release.yml` — trigger khi push tag `v*` (hoặc `workflow_dispatch`). Chạy trên `windows-latest` (có sẵn WebView2 + MSVC), dùng `tauri-apps/tauri-action`. Build Rust lần đầu **~15 phút**. Tạo **GitHub Release dạng draft** (`releaseDraft: true`) đính kèm `.exe` (NSIS) + `.msi` → phải tự vào Releases bấm **Publish**
+- ⚠️ **Bài học quan trọng — bắt buộc build `packages/**` TRƯỚC `tauri-action`**: `tauri-action` (`projectPath: apps/desktop`) chạy `beforeBuildCommand` (`pnpm build`) **trong thư mục `apps/desktop`**, nên chỉ build package đó, **KHÔNG** build lib phụ thuộc `@velix/core`. Vì `dist/` bị gitignore, checkout sạch trên CI không có `@velix/core/dist/*.d.ts` → `vue-tsc` báo `Cannot find module '@velix/core'` và fail. **Local pass mà CI fail** chính vì máy dev đã có `dist` build sẵn từ trước. → Workflow có step riêng `pnpm --filter "./packages/**" build` trước bước build+release. Muốn tái hiện lỗi local: xoá hết `packages/*/dist` rồi build thẳng `apps/desktop`
+- **Release lại cùng tag**: sửa xong thì `git tag -f v0.1.0 && git push -f origin v0.1.0` (force move tag) để trigger lại; nếu Release draft cũ đã tồn tại thì xoá trước bằng `gh release delete`
+- **Tooling**: cần `gh` CLI đã `gh auth login` (không tự động hoá được — bước tương tác). `pnpm@10.32.1`, Node 20 trong workflow
+- ⚠️ Version đang `0.1.0` ở cả `package.json` (root + `apps/desktop`) và `tauri.conf.json` — bump cả 3 khi lên version mới
 
 ## Design
 
