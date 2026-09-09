@@ -75,7 +75,7 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
 - ⚠️ **Bài học quan trọng — bắt buộc build `packages/**` TRƯỚC `tauri-action`**: `tauri-action` (`projectPath: apps/desktop`) chạy `beforeBuildCommand` (`pnpm build`) **trong thư mục `apps/desktop`**, nên chỉ build package đó, **KHÔNG** build lib phụ thuộc `@velix/core`. Vì `dist/` bị gitignore, checkout sạch trên CI không có `@velix/core/dist/*.d.ts` → `vue-tsc` báo `Cannot find module '@velix/core'` và fail. **Local pass mà CI fail** chính vì máy dev đã có `dist` build sẵn từ trước. → Workflow có step riêng `pnpm --filter "./packages/**" build` trước bước build+release. Muốn tái hiện lỗi local: xoá hết `packages/*/dist` rồi build thẳng `apps/desktop`
 - **Release lại cùng tag**: sửa xong thì `git tag -f v0.1.0 && git push -f origin v0.1.0` (force move tag) để trigger lại; nếu Release draft cũ đã tồn tại thì xoá trước bằng `gh release delete`
 - **Tooling**: cần `gh` CLI đã `gh auth login` (không tự động hoá được — bước tương tác). `pnpm@10.32.1`, Node 20 trong workflow
-- ⚠️ Version đang `0.1.0` ở cả `package.json` (root + `apps/desktop`) và `tauri.conf.json` — bump cả 3 khi lên version mới
+- ⚠️ Version nằm ở **4 chỗ**: `package.json` (root + `apps/desktop`), `tauri.conf.json` và `src-tauri/Cargo.toml` — bump cả 4 khi lên version mới (`tauri.conf.json` là cái updater đem đi so sánh)
 - **Secrets bắt buộc** cho updater: `TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Thiếu thì artifact không được ký và app đã cài sẽ **từ chối** bản cập nhật. Khoá sinh sẵn ở `%USERPROFILE%\.tauri\velix.key` (+ `.key.password`)
 - **Repo phải public** thì updater mới tải được asset (release của repo private đòi token)
 
