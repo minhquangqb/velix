@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import { SlidersHorizontal } from '@lucide/vue'
 import type { VelixPlugin } from '@velix/core'
 
@@ -7,12 +9,17 @@ import { pluginMark } from '../registry'
 import { usePlatformsStore } from '../stores/platforms'
 import { useProfilesStore } from '../stores/profiles'
 import { useUiStore } from '../stores/ui'
+import { useUpdatesStore } from '../stores/updates'
 
 const platforms = usePlatformsStore()
 const profiles = useProfilesStore()
 const ui = useUiStore()
+const updates = useUpdatesStore()
 
 const emit = defineEmits<{ select: [plugin: VelixPlugin] }>()
+
+/** Version waiting to be installed, or `''` when there is nothing pending. */
+const pendingUpdate = computed(() => updates.available?.version ?? '')
 
 function badge(pluginId: string) {
   const total = profiles.unreadByPlugin[pluginId] ?? 0
@@ -74,15 +81,22 @@ function badge(pluginId: string) {
 
     <button
       type="button"
-      class="grid h-10 w-10 cursor-pointer place-items-center rounded-[11px] hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
+      class="relative grid h-10 w-10 cursor-pointer place-items-center rounded-[11px] hover:bg-(--vx-ghost) hover:text-(--vx-text)!"
       :style="{
         color: ui.view === 'settings' ? 'var(--vx-text)' : 'var(--vx-text-3)',
         background: ui.view === 'settings' ? 'var(--vx-ghost)' : undefined,
       }"
-      title="Cài đặt"
+      :title="pendingUpdate ? `Cài đặt — có Velix ${pendingUpdate}` : 'Cài đặt'"
       @click="ui.goto('settings')"
     >
       <SlidersHorizontal :size="17" :stroke-width="1.7" aria-hidden="true" />
+      <!-- The only nudge a pending update gets: no toast, no dialog. It steps
+           aside once the user is in settings, where the update itself is shown. -->
+      <span
+        v-if="pendingUpdate && ui.view !== 'settings'"
+        class="absolute top-1 right-1 h-2.5 w-2.5 rounded-full"
+        :style="{ background: 'var(--vx-accent)', border: '2px solid var(--vx-rail)' }"
+      />
     </button>
   </nav>
 </template>

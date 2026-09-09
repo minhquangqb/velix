@@ -2,17 +2,21 @@
 import { computed, ref } from 'vue'
 import type { Theme } from '@velix/core'
 
+import { Check, Download, RefreshCw, TriangleAlert } from '@lucide/vue'
+
 import GlyphBadge from '../components/GlyphBadge.vue'
 import TitleBar from '../components/TitleBar.vue'
 import ToggleSwitch from '../components/ToggleSwitch.vue'
 import { findPlugin, pluginTint } from '../registry'
 import { useProfilesStore } from '../stores/profiles'
 import { useSettingsStore } from '../stores/settings'
+import { useUpdatesStore } from '../stores/updates'
 
-type Section = 'appearance' | 'behaviour' | 'notifications'
+type Section = 'appearance' | 'behaviour' | 'notifications' | 'updates'
 
 const settings = useSettingsStore()
 const profiles = useProfilesStore()
+const updates = useUpdatesStore()
 
 const emit = defineEmits<{ error: [message: string] }>()
 
@@ -22,6 +26,7 @@ const NAV: { id: Section; label: string }[] = [
   { id: 'appearance', label: 'Giao diện' },
   { id: 'behaviour', label: 'Hành vi' },
   { id: 'notifications', label: 'Thông báo' },
+  { id: 'updates', label: 'Cập nhật' },
 ]
 
 const THEMES: { id: Theme; label: string; swatch: string; bar: string }[] = [
@@ -48,6 +53,14 @@ async function run(action: () => Promise<unknown>) {
 function platformName(pluginId: string) {
   return findPlugin(pluginId)?.name ?? pluginId
 }
+
+/** Release dates arrive as RFC 3339 from the feed; only the day is worth showing. */
+const releasedOn = computed(() => {
+  const raw = updates.available?.date
+  if (!raw) return ''
+  const date = new Date(raw.replace(' ', 'T'))
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('vi-VN')
+})
 </script>
 
 <template>
@@ -77,6 +90,11 @@ function platformName(pluginId: string) {
           @click="section = item.id"
         >
           {{ item.label }}
+          <span
+            v-if="item.id === 'updates' && updates.available"
+            class="ml-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle"
+            :style="{ background: 'var(--vx-accent)' }"
+          />
         </button>
       </nav>
 
@@ -189,7 +207,7 @@ function platformName(pluginId: string) {
           </section>
 
           <!-- Thông báo -->
-          <section v-else>
+          <section v-else-if="section === 'notifications'">
             <h2 class="mb-5 font-display text-[19px] font-bold">Thông báo</h2>
 
             <div
@@ -258,6 +276,156 @@ function platformName(pluginId: string) {
                 Chưa có tài khoản nào.
               </p>
             </div>
+          </section>
+
+          <!-- Cập nhật -->
+          <section v-else>
+            <h2 class="mb-5 font-display text-[19px] font-bold">Cập nhật</h2>
+
+            <div
+              class="overflow-hidden rounded-[14px]"
+              style="background: var(--vx-card); border: 1px solid var(--vx-card-border)"
+            >
+              <div class="flex items-center gap-3.5 px-4 py-3.75">
+                <div class="min-w-0 flex-1">
+                  <p class="text-[13.5px] font-semibold">Phiên bản đang dùng</p>
+                  <p class="mt-0.5 font-mono text-[12px]" :style="{ color: 'var(--vx-text-3)' }">
+                    v{{ updates.version }}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="flex cursor-pointer items-center gap-1.75 rounded-[9px] px-3.25 py-2 text-[12.5px] font-semibold disabled:cursor-default disabled:opacity-55"
+                  :style="{
+                    background: 'var(--vx-ghost)',
+                    border: '1px solid var(--vx-input-border)',
+                    color: 'var(--vx-text-2)',
+                  }"
+                  :disabled="updates.busy"
+                  @click="run(() => updates.check())"
+                >
+                  <RefreshCw
+                    :size="14"
+                    :stroke-width="1.9"
+                    :class="updates.status?.phase === 'checking' ? 'vx-spin' : ''"
+                    aria-hidden="true"
+                  />
+                  {{ updates.status?.phase === 'checking' ? 'Đang kiểm tra…' : 'Kiểm tra ngay' }}
+                </button>
+              </div>
+
+              <div
+                v-if="updates.status && updates.status.phase !== 'checking'"
+                class="px-4 py-3.75"
+                style="border-top: 1px solid var(--vx-divider)"
+              >
+                <!-- Không có gì để cài -->
+                <p
+                  v-if="updates.status.phase === 'upToDate'"
+                  class="flex items-center gap-2 text-[13px]"
+                  :style="{ color: 'var(--vx-success)' }"
+                >
+                  <Check :size="15" :stroke-width="2.2" aria-hidden="true" />
+                  Đang dùng bản mới nhất.
+                </p>
+
+                <!-- Có bản mới -->
+                <template v-else-if="updates.available">
+                  <div class="mb-2.5 flex items-baseline gap-2">
+                    <p class="font-display text-[15px] font-bold">
+                      Velix {{ updates.available.version }}
+                    </p>
+                    <span v-if="releasedOn" class="text-[11.5px]" :style="{ color: 'var(--vx-text-4)' }">
+                      {{ releasedOn }}
+                    </span>
+                  </div>
+
+                  <p
+                    v-if="updates.available.notes"
+                    class="mb-3.5 max-h-40 overflow-y-auto rounded-[10px] px-3 py-2.5 text-[12.5px] leading-relaxed whitespace-pre-wrap"
+                    :style="{ background: 'var(--vx-well)', color: 'var(--vx-text-2)' }"
+                  >{{ updates.available.notes }}</p>
+
+                  <button
+                    type="button"
+                    class="flex cursor-pointer items-center gap-1.75 rounded-[9px] px-4 py-2 text-[12.5px] font-bold text-white disabled:cursor-default disabled:opacity-55"
+                    style="
+                      background: var(--vx-accent-grad);
+                      box-shadow:
+                        0 3px 10px rgba(100, 116, 238, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+                    "
+                    :disabled="updates.busy"
+                    @click="run(() => updates.install())"
+                  >
+                    <Download :size="14" :stroke-width="2" aria-hidden="true" />
+                    Tải và cài đặt
+                  </button>
+                  <p class="mt-2 text-[12px]" :style="{ color: 'var(--vx-text-4)' }">
+                    Velix khởi động lại sau khi cài xong; các phiên đăng nhập vẫn giữ nguyên.
+                  </p>
+                </template>
+
+                <!-- Đang tải / đang cài -->
+                <template v-else-if="updates.status.phase === 'downloading'">
+                  <p class="mb-2 text-[13px]" :style="{ color: 'var(--vx-text-2)' }">
+                    Đang tải bản cập nhật…
+                    <span v-if="updates.percent !== null" class="font-mono tabular-nums">
+                      {{ updates.percent }}%
+                    </span>
+                  </p>
+                  <div
+                    class="h-1.5 overflow-hidden rounded-full"
+                    :style="{ background: 'var(--vx-track-off)' }"
+                    role="progressbar"
+                    aria-label="Tiến độ tải bản cập nhật"
+                    :aria-valuenow="updates.percent ?? undefined"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                  >
+                    <div
+                      class="h-full rounded-full transition-[width] duration-200"
+                      :style="{
+                        width: updates.percent === null ? '100%' : updates.percent + '%',
+                        background: 'var(--vx-accent-grad)',
+                      }"
+                    />
+                  </div>
+                </template>
+
+                <p
+                  v-else-if="updates.status.phase === 'installing'"
+                  class="text-[13px]"
+                  :style="{ color: 'var(--vx-text-2)' }"
+                >
+                  Đang cài đặt — Velix sẽ tự khởi động lại.
+                </p>
+
+                <!-- Lỗi -->
+                <div v-else-if="updates.error" class="flex items-start gap-2">
+                  <TriangleAlert
+                    :size="15"
+                    :stroke-width="2"
+                    class="mt-0.5 shrink-0"
+                    :style="{ color: 'var(--vx-danger)' }"
+                    aria-hidden="true"
+                  />
+                  <div class="min-w-0">
+                    <p class="text-[13px] font-semibold" :style="{ color: 'var(--vx-danger)' }">
+                      Không kiểm tra được bản cập nhật
+                    </p>
+                    <p class="mt-0.5 text-[12px] break-words" :style="{ color: 'var(--vx-text-3)' }">
+                      {{ updates.error }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p class="mt-3 ml-0.5 text-[12px] leading-relaxed" :style="{ color: 'var(--vx-text-4)' }">
+              Velix tự kiểm tra bản mới mỗi 6 giờ và chỉ hiện một chấm nhỏ ở nút Cài đặt — không
+              bao giờ tự tải hay tự cài.
+            </p>
           </section>
         </div>
       </div>

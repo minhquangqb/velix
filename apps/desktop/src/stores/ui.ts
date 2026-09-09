@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { onNavigate, onWindowStatus, windowIsMaximized } from '@velix/core'
+import { lastProfile, onNavigate, onWindowStatus, windowIsMaximized } from '@velix/core'
 
 import { usePlatformsStore } from './platforms'
 import { useProfilesStore } from './profiles'
@@ -44,6 +44,24 @@ export const useUiStore = defineStore('ui', {
         this.firstRunDone = true
         await useTabsStore().open(profile)
       })
+    },
+    /**
+     * Reopens the account that was on screen when the app last closed.
+     *
+     * Runs once at startup, after profiles are loaded so the id can be resolved
+     * to a real account. Skipped when the shell is already on another view: the
+     * tray can push a navigation while the app is still starting, and that
+     * choice is newer than the remembered one.
+     */
+    async restoreLast() {
+      if (this.view !== 'main') return
+      const id = await lastProfile()
+      if (!id) return
+
+      const profile = useProfilesStore().find(id)
+      if (!profile) return
+      usePlatformsStore().select(profile.pluginId)
+      await useTabsStore().open(profile)
     },
     /**
      * Navigates. Every view except `main` covers the workspace area, so the

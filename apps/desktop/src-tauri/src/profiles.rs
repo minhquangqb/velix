@@ -94,6 +94,10 @@ pub async fn delete_profile<R: Runtime>(
             return Err(format!("profile not found: {id}"));
         };
         let removed = store.config.profiles.remove(index);
+        // Otherwise the next launch would try to reopen an account that is gone.
+        if store.config.last_profile_id.as_deref() == Some(id.as_str()) {
+            store.config.last_profile_id = None;
+        }
         store.save()?;
         removed
     };

@@ -90,6 +90,11 @@ pub struct Config {
     pub window: WindowState,
     #[serde(default)]
     pub settings: Settings,
+    /// Account that was on screen when the app last closed, reopened on the next
+    /// launch. Session state rather than a preference, so it sits outside
+    /// `Settings` and never reaches the settings UI.
+    #[serde(default)]
+    pub last_profile_id: Option<String>,
 }
 
 /// JSON-backed app config. All mutations go through this store so the file on

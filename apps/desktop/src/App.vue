@@ -9,10 +9,12 @@ import SettingsView from './views/SettingsView.vue'
 import { useProfilesStore } from './stores/profiles'
 import { useSettingsStore } from './stores/settings'
 import { useUiStore } from './stores/ui'
+import { useUpdatesStore } from './stores/updates'
 
 const profiles = useProfilesStore()
 const settings = useSettingsStore()
 const ui = useUiStore()
+const updates = useUpdatesStore()
 
 const error = ref<string | null>(null)
 const unsubscribes: (() => void)[] = []
@@ -35,7 +37,10 @@ onMounted(async () => {
       profiles.watchUnread().then((off) => unsubscribes.push(off)),
       ui.watchWindow().then((off) => unsubscribes.push(off)),
       ui.watchNavigate().then((off) => unsubscribes.push(off)),
+      updates.load().then((off) => unsubscribes.push(off)),
     ])
+    // After the loads, so the remembered id resolves against real profiles.
+    await ui.restoreLast()
   } catch (e) {
     error.value = String(e)
   }

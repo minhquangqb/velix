@@ -191,10 +191,59 @@ fn show_only<R: Runtime>(window: &Window<R>, label: &str) -> Result<(), String> 
         .0
         .lock()
         .unwrap() = Some(label.to_string());
+    remember_last_profile(window.app_handle(), label);
 
     // The user is now looking at it, so its notifications are no longer unread.
     bridge::clear_unread(window.app_handle(), label);
     Ok(())
+}
+
+/// Records which account is on screen so the next launch reopens it.
+///
+/// Hooked into `show_only` because that is the one funnel every switch passes
+/// through — opening, focusing and tray navigation all end here. The profile is
+/// resolved back out of the label rather than threaded through every caller,
+/// since `webview_label` is the only thing that builds one.
+///
+/// Written through to disk immediately, unlike the window geometry: switching
+/// account is a discrete action a handful of times a day, not a stream of
+/// events, so there is no reason to risk losing it if the app is killed.
+fn remember_last_profile<R: Runtime>(app: &AppHandle<R>, label: &str) {
+    let state = app.state::<AppState>();
+    let mut store = state.0.lock().unwrap();
+    let found = store
+        .config
+        .profiles
+        .iter()
+        .find(|p| webview_label(&p.plugin_id, &p.id) == label)
+        .map(|p| p.id.clone());
+
+    let Some(id) = found else { return };
+    if store.config.last_profile_id.as_deref() == Some(id.as_str()) {
+        return;
+    }
+    store.config.last_profile_id = Some(id);
+    let _ = store.save();
+}
+
+/// The account to reopen on launch, if it still exists.
+#[tauri::command]
+pub fn last_profile(state: tauri::State<'_, AppState>) -> Option<String> {
+    let store = state.0.lock().unwrap();
+    let resolved = store.config.last_profile_id.as_deref().and_then(|id| {
+        store
+            .config
+            .profiles
+            .iter()
+            .find(|p| p.id == id)
+            .map(|p| p.id.clone())
+    });
+    #[cfg(debug_assertions)]
+    eprintln!(
+        "[velix] last_profile: stored={:?} resolved={:?}",
+        store.config.last_profile_id, resolved
+    );
+    resolved
 }
 
 fn main_window<R: Runtime>(app: &AppHandle<R>) -> Result<Window<R>, String> {
@@ -238,6 +287,8 @@ pub async fn open_webview<R: Runtime>(
 
     let window = main_window(&app)?;
     let label = webview_label(&plugin_id, &profile_id);
+    #[cfg(debug_assertions)]
+    eprintln!("[velix] open_webview: {label}");
 
     if !window.webviews().iter().any(|w| w.label() == label) {
         let parsed = url

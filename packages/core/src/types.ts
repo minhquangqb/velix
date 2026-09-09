@@ -43,3 +43,25 @@ export interface NavigateRequest {
   /** Set for `view: "account"`, naming the account to bring forward. */
   profileId: string | null
 }
+
+/** A build offered by the update feed. */
+export interface UpdateInfo {
+  version: string
+  /** Version running right now, so both sides of the upgrade can be shown. */
+  currentVersion: string
+  /** Release notes, as written in the GitHub release body. */
+  notes: string | null
+  date: string | null
+}
+
+/**
+ * Every phase of the update flow, discriminated on `phase` exactly as Rust
+ * tags it. An automatic check and a manual one produce the same values.
+ */
+export type UpdateStatus =
+  | { phase: 'checking' }
+  | { phase: 'upToDate' }
+  | { phase: 'available'; info: UpdateInfo }
+  | { phase: 'downloading'; received: number; total: number | null }
+  | { phase: 'installing' }
+  | { phase: 'failed'; message: string }

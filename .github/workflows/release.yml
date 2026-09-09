@@ -45,14 +45,22 @@ jobs:
       - name: Build workspace libraries
         run: pnpm --filter "./packages/**" build
 
+      # The signing keys are what the installed app checks before it will apply
+      # an update; without them tauri-action builds unsigned artifacts and the
+      # updater rejects every release it is offered.
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/desktop
           tagName: ${{ github.ref_name }}
           releaseName: 'Velix ${{ github.ref_name }}'
           releaseBody: 'Tải installer Windows (.exe / .msi) ở phần Assets bên dưới.'
+          # latest.json is the update feed; it only becomes reachable at
+          # /releases/latest/download/ once the draft is published.
+          includeUpdaterJson: true
           releaseDraft: true
           prerelease: false

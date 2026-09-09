@@ -1,6 +1,15 @@
 // Platform-agnostic core: typed IPC wrappers over the Rust managers.
 export type { VelixPlugin } from '@velix/sdk'
-export type { NavigateRequest, Profile, Settings, Theme, UnreadEntry, WindowStatus } from './types'
+export type {
+  NavigateRequest,
+  Profile,
+  Settings,
+  Theme,
+  UnreadEntry,
+  UpdateInfo,
+  UpdateStatus,
+  WindowStatus,
+} from './types'
 export {
   listProfiles,
   createProfile,
@@ -16,6 +25,10 @@ export {
   webviewForward,
   webviewReload,
   webviewSetZoom,
+  lastProfile,
+  appVersion,
+  checkUpdate,
+  installUpdate,
   getSettings,
   setTheme,
   setQuiet,
@@ -36,4 +49,5 @@ export {
   onSettings,
   onWindowStatus,
   onNavigate,
+  onUpdate,
 } from './ipc'

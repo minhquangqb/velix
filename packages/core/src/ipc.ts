@@ -1,7 +1,16 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
-import type { NavigateRequest, Profile, Settings, Theme, UnreadEntry, WindowStatus } from './types'
+import type {
+  NavigateRequest,
+  Profile,
+  Settings,
+  Theme,
+  UnreadEntry,
+  UpdateInfo,
+  UpdateStatus,
+  WindowStatus,
+} from './types'
 
 export function listProfiles(): Promise<Profile[]> {
   return invoke('list_profiles')
@@ -62,6 +71,11 @@ export function webviewReload(): Promise<void> {
 /** Sets native zoom (clamped in Rust); resolves to the factor actually applied. */
 export function webviewSetZoom(factor: number): Promise<number> {
   return invoke('webview_set_zoom', { factor })
+}
+
+/** The account that was on screen when the app last closed, if it still exists. */
+export function lastProfile(): Promise<string | null> {
+  return invoke('last_profile')
 }
 
 export function getSettings(): Promise<Settings> {
@@ -145,10 +159,30 @@ export function windowStartDrag(): Promise<void> {
   return invoke('window_start_drag')
 }
 
+// Updates run through our own commands rather than the updater plugin's JS API,
+// so the ACL stays closed to the remote platform webviews.
+export function appVersion(): Promise<string> {
+  return invoke('app_version')
+}
+
+/** Asks the feed for a newer build; resolves to `null` when already current. */
+export function checkUpdate(): Promise<UpdateInfo | null> {
+  return invoke('check_update')
+}
+
+/**
+ * Downloads, installs and restarts into the new build. On success the process
+ * is replaced, so this promise normally never settles.
+ */
+export function installUpdate(): Promise<void> {
+  return invoke('install_update')
+}
+
 const UNREAD_EVENT = 'velix://unread'
 const SETTINGS_EVENT = 'velix://settings'
 const WINDOW_EVENT = 'velix://window'
 const NAVIGATE_EVENT = 'velix://navigate'
+const UPDATE_EVENT = 'velix://update'
 
 /** Subscribes to unread-count changes; resolves to an unsubscribe function. */
 export function onUnread(handler: (entries: UnreadEntry[]) => void): Promise<() => void> {
@@ -167,4 +201,9 @@ export function onWindowStatus(handler: (status: WindowStatus) => void): Promise
 /** View changes requested from outside the shell, e.g. the tray popup. */
 export function onNavigate(handler: (request: NavigateRequest) => void): Promise<() => void> {
   return listen<NavigateRequest>(NAVIGATE_EVENT, (event) => handler(event.payload))
+}
+
+/** Progress of the update flow, from both manual and automatic checks. */
+export function onUpdate(handler: (status: UpdateStatus) => void): Promise<() => void> {
+  return listen<UpdateStatus>(UPDATE_EVENT, (event) => handler(event.payload))
 }

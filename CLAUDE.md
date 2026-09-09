@@ -7,6 +7,7 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
 - [docs/Velix-Project-Plan.md](docs/Velix-Project-Plan.md) — vision, architecture, roadmap
 - [docs/Implementation-Plan.md](docs/Implementation-Plan.md) — kế hoạch triển khai theo phase; luôn làm đúng phase đang được yêu cầu, không làm trước phase sau
 - [docs/Feature-Spec-For-Design.md](docs/Feature-Spec-For-Design.md) — spec tính năng bàn giao cho design (không mô tả visual)
+- [docs/release-updates.md](docs/release-updates.md) — phát hành + tự cập nhật: quy trình tag/publish, chữ ký số, invariants; đọc khi đụng `updater.rs`, `release.yml` hoặc bump version
 - [docs/references/pake-learnings.md](docs/references/pake-learnings.md) — kỹ thuật tham khảo từ Pake (tw93/Pake, MIT): notification/badge polyfill, OAuth trong webview, link/download interception, native zoom, config schema — đọc khi làm inject baseline trong core/sdk hoặc plugin
 
 ## Tiến độ (cập nhật 2026-07-21)
@@ -58,8 +59,14 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
   - ✅ **Navigation + zoom** (commit `2671e7e`), verify OK. Command `webview_back`/`forward`/`reload`/`set_zoom` trong `webviews.rs`, chạy trên webview **active** (`ActiveWebview` state), gọi từ shell `ui` tin cậy nên **không** đụng ACL remote. back/forward qua `eval("history.back()")` (wry không có API go-back; SPA tự lo); zoom bằng `webview.set_zoom` **native** (KHÔNG CSS transform — vỡ layout SPA), nhớ theo từng account trong `tabs.zoom`, clamp 0.5–2.0. UI: cụm nút trong `TitleBar` slot `leading` (đặt NGOÀI vùng drag để không kích hoạt kéo cửa sổ), chỉ hiện khi có account mở
   - ⬜ **Spike đăng nhập Zalo/Telegram/ChatGPT** (build + install, **không** dev mode): thử login. Google chặn OAuth trong webview nhúng → có thể phải giả user-agent per-platform (pake-learnings mục 1). *Messenger đã login OK.* Mỗi nền tảng khi bring-up phải `__velixProbe()` xem nó dùng API hay title cho notification
   - ⚠️ **Notification chỉ đúng tên/icon Velix khi BUILD + INSTALL** — dev mode toast mang tên PowerShell (caveat Phase 2, WinRT cần AppUserModelID từ shortcut Start Menu). Không phải bug
-  - **Chẩn đoán còn cắm trong code** (gỡ ở Phase 5 trước release): JS `window.__velixProbe()` / `__velixTest()`; Rust `eprintln!("[velix] ...")` (chỉ debug build); `Ctrl+Shift+I` mở devtools webview nền tảng (global shortcut vì webview con giữ bàn phím). Tái dùng khi bring-up 3 nền tảng còn lại
-- Chưa làm: Phase 4 (plugin system), Downloads (tách riêng), Phase 5 (release)
+  - **Chẩn đoán còn cắm trong code** (gỡ ở Phase 5 trước release): JS `window.__velixProbe()` / `__velixTest()`; Rust `eprintln!("[velix] ...")` (chỉ debug build — gồm cả `last_profile` và `open_webview` trong `webviews.rs`, thêm khi verify tính năng nhớ tab); `Ctrl+Shift+I` mở devtools webview nền tảng (global shortcut vì webview con giữ bàn phím). Tái dùng khi bring-up 3 nền tảng còn lại
+- ✅ **Tự cập nhật + nhớ tab đang mở** (kéo sớm từ Phase 5, làm ngoài thứ tự phase theo yêu cầu user)
+  - `updater.rs` — luồng update viết **bằng Rust**, không dùng JS API của `tauri-plugin-updater`: shell nằm trong webview con, giữ mọi bề mặt IPC là command của mình thì ACL mới tiếp tục đóng với webview remote. Command `app_version` / `check_update` / `install_update`; tiến độ đi qua event `velix://update` (`emit_to` webview `ui`, không broadcast) dưới dạng union tag theo `phase`
+  - Tự kiểm tra nền: chờ 20s sau khi mở rồi lặp mỗi 6 giờ, **chỉ** emit `Available`. Biểu hiện duy nhất là chấm nhỏ trên nút Cài đặt ở rail — đúng yêu cầu "thông báo không làm phiền" của spec. Không toast, không dialog, không tự cài. Tắt hẳn ở debug build
+  - ⚠️ Banner nổi trên workspace **không dùng được**: webview nền tảng vẽ đè lên shell nên sẽ bị che (cùng lý do với các bề mặt full-window)
+  - **Chi tiết quy trình phát hành, chữ ký, invariants**: xem [docs/release-updates.md](docs/release-updates.md). Ba điều dễ quên nhất: release draft phải bấm **Publish** thì updater mới thấy; version phải khớp ở cả ba file; **không được đổi cặp khoá ký**
+  - **Nhớ account đang xem**: `config.last_profile_id`, ghi trong `remember_last_profile` móc vào `show_only` (`webviews.rs`) — cái phễu duy nhất mà mọi lần đổi account đều đi qua. Ghi **thẳng xuống đĩa** ngay (khác window geometry chỉ ghi lúc thoát): đổi account là thao tác rời rạc vài chục lần một ngày, không phải luồng event liên tục. Shell đọc bằng `last_profile` rồi `ui.restoreLast()` gọi sau khi profiles đã load
+- Chưa làm: Phase 4 (plugin system), Downloads (tách riêng), Phase 5 (phần còn lại)
 
 ## Release / CI (GitHub)
 
@@ -69,6 +76,8 @@ Desktop workspace chạy nhiều web app (Messenger, Zalo, Telegram, ChatGPT...)
 - **Release lại cùng tag**: sửa xong thì `git tag -f v0.1.0 && git push -f origin v0.1.0` (force move tag) để trigger lại; nếu Release draft cũ đã tồn tại thì xoá trước bằng `gh release delete`
 - **Tooling**: cần `gh` CLI đã `gh auth login` (không tự động hoá được — bước tương tác). `pnpm@10.32.1`, Node 20 trong workflow
 - ⚠️ Version đang `0.1.0` ở cả `package.json` (root + `apps/desktop`) và `tauri.conf.json` — bump cả 3 khi lên version mới
+- **Secrets bắt buộc** cho updater: `TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Thiếu thì artifact không được ký và app đã cài sẽ **từ chối** bản cập nhật. Khoá sinh sẵn ở `%USERPROFILE%\.tauri\velix.key` (+ `.key.password`)
+- **Repo phải public** thì updater mới tải được asset (release của repo private đòi token)
 
 ## Design
 

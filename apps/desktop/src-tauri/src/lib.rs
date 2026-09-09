@@ -3,6 +3,7 @@ mod config;
 mod profiles;
 mod settings;
 mod tray;
+mod updater;
 mod webviews;
 mod window_ctl;
 mod window_state;
@@ -110,6 +111,7 @@ pub fn run() {
             Some(vec![AUTOSTART_FLAG]),
         ))
         .plugin(global_shortcut_plugin())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(bridge::init())
         .setup(|app| {
             let config_path = app.path().app_config_dir()?.join("config.json");
@@ -156,6 +158,7 @@ pub fn run() {
 
             tray::build_popup(app.handle())?;
             tray::build(app.handle())?;
+            updater::start_auto_check(app.handle().clone());
 
             let handle = window.clone();
             window.on_window_event(move |event| match event {
@@ -202,6 +205,10 @@ pub fn run() {
             webviews::webview_forward,
             webviews::webview_reload,
             webviews::webview_set_zoom,
+            webviews::last_profile,
+            updater::app_version,
+            updater::check_update,
+            updater::install_update,
             window_ctl::window_is_maximized,
             window_ctl::window_minimize,
             window_ctl::window_toggle_maximize,
