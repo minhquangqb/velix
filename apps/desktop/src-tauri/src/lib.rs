@@ -10,11 +10,11 @@ mod window_state;
 use std::sync::Mutex;
 
 use tauri::{
-    webview::WebviewBuilder, window::WindowBuilder, LogicalPosition, LogicalSize, Manager,
-    RunEvent, WebviewUrl, WindowEvent,
+    webview::WebviewBuilder, window::WindowBuilder, AppHandle, LogicalPosition, LogicalSize,
+    Manager, RunEvent, Runtime, WebviewUrl, WindowEvent,
 };
 use tauri_plugin_autostart::MacosLauncher;
-use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use config::ConfigStore;
 
@@ -28,32 +28,82 @@ fn launched_by_autostart() -> bool {
 }
 
 /// `Ctrl+Shift+V` brings the window back — the shortcut the tray popup advertises.
-/// In debug builds `Ctrl+Shift+I` opens devtools on the platform webview on
-/// screen; it has to be a global shortcut because that webview owns the
-/// keyboard while it is focused, so a key handler in the shell never sees it.
-fn global_shortcut_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
-    let toggle = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV);
-    let devtools = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyI);
+fn toggle_shortcut() -> Shortcut {
+    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV)
+}
+
+/// `Ctrl+Shift+I` opens devtools on the platform webview on screen. It has to be
+/// a global shortcut because that webview owns the keyboard while it is focused,
+/// so a key handler in the shell never sees it. Debug builds only — registering
+/// it in a release build would take the combination away from every other app,
+/// including the browser devtools it is named after.
+#[cfg(debug_assertions)]
+fn devtools_shortcut() -> Shortcut {
+    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyI)
+}
+
+fn global_shortcut_plugin<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri_plugin_global_shortcut::Builder::new()
-        .with_shortcuts([toggle, devtools])
-        .expect("invalid global shortcut")
+        // Shortcuts are registered in `setup` instead of here: `with_shortcuts`
+        // registers during plugin init, where a failure aborts the whole app.
         .with_handler(move |app, shortcut, event| {
             if event.state() != ShortcutState::Pressed {
                 return;
             }
-            if shortcut == &toggle {
+            if shortcut == &toggle_shortcut() {
                 tray::show_main(app);
-            } else if shortcut == &devtools {
-                #[cfg(debug_assertions)]
+            }
+            #[cfg(debug_assertions)]
+            if shortcut == &devtools_shortcut() {
                 webviews::open_devtools(app);
             }
         })
         .build()
 }
 
+/// Registers the global shortcuts, tolerating failure.
+///
+/// The combination can already be owned by another app — or by a Velix that is
+/// still alive in the tray. Registering inside the plugin builder turned that
+/// into `PluginInitialization("global-shortcut", "HotKey already registered")`,
+/// which panicked before any window existed: the app died with no console, no
+/// dialog and no event-log entry, so launching it simply appeared to do nothing.
+/// Losing a convenience hotkey must never cost the user the app.
+fn register_shortcuts<R: Runtime>(app: &AppHandle<R>) {
+    let manager = app.global_shortcut();
+    let shortcuts = [
+        toggle_shortcut(),
+        #[cfg(debug_assertions)]
+        devtools_shortcut(),
+    ];
+    for shortcut in shortcuts {
+        if let Err(err) = manager.register(shortcut) {
+            eprintln!("[velix] global shortcut {shortcut} unavailable: {err}");
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // Registered first, and deliberately so: a second launch hands its arguments
+    // to the instance already running and exits before any other plugin — or any
+    // window — gets a chance to fail. Without it, launching Velix while it sits
+    // in the tray started a doomed process instead of raising the live window.
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // A boot-time relaunch belongs in the tray; only a user-initiated one
+            // means "bring the window to me".
+            if args.iter().any(|arg| arg == AUTOSTART_FLAG) {
+                return;
+            }
+            tray::show_main(app);
+        }));
+    }
+
+    let app = builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -68,6 +118,7 @@ pub fn run() {
             app.manage(webviews::ActiveWebview::default());
             app.manage(tray::TrayState::default());
             settings::sync_autostart(app.handle());
+            register_shortcuts(app.handle());
 
             let saved = {
                 let state = app.state::<AppState>();

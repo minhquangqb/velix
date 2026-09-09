@@ -18,6 +18,9 @@ tauri = { version = "2.11.1", features = ["unstable", "tray-icon", "image-png"] 
 tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
+# Keeps a relaunch from starting a doomed second process while Velix sits in the
+# tray: the new process hands its arguments over and exits, the live one shows.
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Opens external links (message links) in the system browser rather than
