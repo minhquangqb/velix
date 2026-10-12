@@ -14,7 +14,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # 2.11.1 is the first release fixing GHSA-7gmj-67g7-phm9, where a remote origin
 # could be mistaken for a local one on Windows — exactly our remote-webview setup.
-tauri = { version = "2.11.1", features = ["unstable", "tray-icon", "image-png"] }
+# macos-private-api: the tray popup is a transparent window, which macOS only
+# allows through private API (fine outside the Mac App Store).
+tauri = { version = "2.11.1", features = ["unstable", "tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"

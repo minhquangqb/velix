@@ -24,7 +24,9 @@ thì bản cập nhật bị từ chối, kể cả khi tải về thành công.
 
 1. Bump version ở **cả ba** chỗ: `package.json` (root), `apps/desktop/package.json`,
    `apps/desktop/src-tauri/tauri.conf.json`
-2. `git tag vX.Y.Z && git push origin vX.Y.Z` → workflow chạy trên `windows-latest`
+2. `git tag vX.Y.Z && git push origin vX.Y.Z` → workflow chạy matrix 3 job song song:
+   `windows-latest`, `macos-latest` (aarch64) và `macos-latest` cross-compile x86_64. Cả ba
+   đẩy asset vào **cùng một** draft release và gộp chung một `latest.json`
 3. `tauri-action` build, **ký** artifact bằng `TAURI_SIGNING_PRIVATE_KEY`, sinh `latest.json`
    (`includeUpdaterJson: true`) và tạo GitHub Release dạng **draft**
 4. Vào Releases bấm **Publish** — đây là bước bắt buộc, xem Invariants
@@ -47,6 +49,11 @@ thì bản cập nhật bị từ chối, kể cả khi tải về thành công.
   GitHub secrets. Đổi khoá = mọi bản đã cài ngoài kia không cập nhật được nữa, phải cài tay
 - **Repo `minhquangqb/velix` phải public.** Asset của repo private đòi token mới tải được,
   còn updater thì gọi trần không kèm auth
+- **macOS cần `macos-private-api`** (feature Cargo + `app.macOSPrivateApi`) vì tray popup là
+  cửa sổ `transparent` — thiếu thì không compile trên mac. Không lên được Mac App Store, chấp nhận
+- **macOS chỉ ad-hoc sign** (`bundle.macOS.signingIdentity: "-"`), chưa có Apple Developer ID nên
+  chưa notarize: lần đầu mở bị Gatekeeper chặn, người dùng phải `xattr -cr /Applications/Velix.app`.
+  Updater vẫn chạy vì nó kiểm chữ ký minisign của Tauri, không phải chữ ký Apple
 - Mọi event `velix://update` đi bằng `emit_to(UI_LABEL, …)`, không bao giờ broadcast — hệt
   các event khác, để webview nền tảng remote không nghe được
 
